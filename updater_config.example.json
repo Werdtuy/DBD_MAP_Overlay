@@ -1,0 +1,7 @@
+{
+  "repository": "Werdtuy/DBD_MAPoverlay",
+  "release_tag": "latest-beta",
+  "package_asset": "DBDCompanionOverlay.zip",
+  "manifest_asset": "update_manifest.json",
+  "github_token": ""
+}

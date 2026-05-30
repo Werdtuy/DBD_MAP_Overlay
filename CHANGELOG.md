@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 1.2
+
+- Added `DBDCompanionUpdater.exe` beside the overlay app.
+- Added quiet startup checks for GitHub beta updates.
+- Added background update downloads that install after the overlay closes and relaunch the updated app.
+- Added a GitHub Actions workflow that publishes the newest shareable zip as the `latest-beta` release.
+
 ## Beta 1.15
 
 - Removed outdated manual map-file setup instructions from the README.

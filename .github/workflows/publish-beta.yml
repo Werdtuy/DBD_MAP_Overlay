@@ -1,0 +1,47 @@
+name: Publish beta package
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-beta:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build overlay and updater
+        run: python scripts/build.py -Windowed
+
+      - name: Read package version
+        shell: pwsh
+        run: |
+          $manifest = Get-Content update_manifest.json | ConvertFrom-Json
+          "APP_VERSION=$($manifest.version)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Publish latest beta release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-beta --cleanup-tag --yes 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "No previous latest-beta release exists."
+          }
+          gh release create latest-beta release/DBDCompanionOverlay.zip update_manifest.json `
+            --title "DBD Companion Overlay $env:APP_VERSION" `
+            --notes "Automatic beta package for $env:APP_VERSION." `
+            --prerelease `
+            --target $env:GITHUB_SHA

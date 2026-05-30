@@ -6,7 +6,13 @@ dist/
 release/
 *.spec
 DBDCompanionOverlay.exe
+DBDCompanionUpdater.exe
 startup_error.log
+updater.log
+updater_config.json
+version.json
+update_manifest.json
+.dbd-overlay-updater.lock
 logs/
 plugins/
 Maps/Hens Callouts/
