@@ -15,8 +15,6 @@ from .rendering import AnimatedImage, render_frame
 
 TRANSPARENT_COLOR = "#010203"
 GWL_EXSTYLE = -20
-GA_ROOT = 2
-WS_EX_LAYERED = 0x00080000
 WS_EX_TRANSPARENT = 0x00000020
 SWP_NOSIZE = 0x0001
 SWP_NOMOVE = 0x0002
@@ -89,8 +87,8 @@ class OverlayWindow:
             get_window_long.restype = ctypes.c_ssize_t
             set_window_long.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t]
             set_window_long.restype = ctypes.c_ssize_t
-            user32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
-            user32.GetAncestor.restype = ctypes.c_void_p
+            user32.GetParent.argtypes = [ctypes.c_void_p]
+            user32.GetParent.restype = ctypes.c_void_p
             user32.SetWindowPos.argtypes = [
                 ctypes.c_void_p,
                 ctypes.c_void_p,
@@ -103,24 +101,18 @@ class OverlayWindow:
             user32.SetWindowPos.restype = ctypes.c_bool
 
             hwnd = ctypes.c_void_p(self.window.winfo_id())
-            root_hwnd = user32.GetAncestor(hwnd, GA_ROOT)
-            targets = [hwnd.value]
-            if root_hwnd and root_hwnd not in targets:
-                targets.append(root_hwnd)
-
-            for target in targets:
-                style = get_window_long(target, GWL_EXSTYLE)
-                style |= WS_EX_LAYERED | WS_EX_TRANSPARENT
-                set_window_long(target, GWL_EXSTYLE, style)
-                user32.SetWindowPos(
-                    target,
-                    None,
-                    0,
-                    0,
-                    0,
-                    0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
-                )
+            wrapper_hwnd = user32.GetParent(hwnd) or hwnd.value
+            style = get_window_long(wrapper_hwnd, GWL_EXSTYLE)
+            set_window_long(wrapper_hwnd, GWL_EXSTYLE, style | WS_EX_TRANSPARENT)
+            user32.SetWindowPos(
+                wrapper_hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            )
         except Exception as exc:
             self.logger.warning("Could not make overlay click-through: %s", exc)
 

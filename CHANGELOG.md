@@ -8,6 +8,7 @@
 - Made overlay readout two lines: detected map and accuracy.
 - Added configurable 4x4 edge-only overlay placement picker.
 - Added click-through overlay window support for Windows.
+- Fixed click-through styling so the overlay remains visible after launch.
 - Added automatic settings save/import behavior.
 - Added Tesseract auto-detection and visible search output.
 - Added startup-hidden map sidebar with a compact Maps button.
