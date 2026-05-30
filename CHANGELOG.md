@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.37
+
+- Added a README checklist for testing the integrated update flow from an older packaged beta.
+
 ## Beta 1.36
 
 - Fixed local builds with Microsoft Store Python installations that do not keep Visual C++ runtime DLLs beside `python.exe`.
