@@ -7,6 +7,7 @@
 - Added force-update hotkey display in the overlay readout and Detection tab.
 - Made overlay readout two lines: detected map and accuracy.
 - Added configurable 4x4 edge-only overlay placement picker.
+- Enlarged the overlay position picker and moved map controls into a collapsible Map Settings section.
 - Added click-through overlay window support for Windows.
 - Fixed click-through styling so the overlay remains visible after launch.
 - Added automatic settings save/import behavior.

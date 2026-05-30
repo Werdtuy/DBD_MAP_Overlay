@@ -92,6 +92,9 @@ class OverlayApp:
         self.map_toggle_button: ctk.CTkButton | None = None
         self.sidebar_show_button: ctk.CTkButton | None = None
         self.map_actions: ctk.CTkFrame | None = None
+        self.map_settings_frame: ctk.CTkFrame | None = None
+        self.map_settings_button: ctk.CTkButton | None = None
+        self.map_settings_visible = False
 
         self._build_ui()
         self._save_now()
@@ -285,18 +288,28 @@ class OverlayApp:
         self.overlay_status_label.grid(row=2, column=0, padx=14, pady=(0, 8), sticky="w")
 
         self._build_position_picker(controls, 3)
-        self._build_monitor_picker(controls, 4)
-        self._slider(controls, 5, "Opacity", self.config.overlay.opacity, 0.2, 1.0, self._set_opacity)
-        self._slider(controls, 6, "Size", self.config.overlay.size, 120, 720, self._set_size)
-        self._slider(controls, 7, "Zoom", self.config.overlay.zoom, 0.4, 2.4, self._set_zoom)
-        self._slider(controls, 8, "Corner radius", self.config.overlay.corner_radius, 0, 80, self._set_radius)
-        self._slider(controls, 9, "Animation speed", self.config.overlay.animation_speed, 0.25, 3.0, self._set_animation_speed)
-
-        self.rotate_var = tk.BooleanVar(value=self.config.overlay.rotate_with_minimap)
-        ctk.CTkSwitch(controls, text="Minimap rotation ready", variable=self.rotate_var, command=self._set_rotation, **self._switch_style()).grid(
-            row=10, column=0, padx=14, pady=16, sticky="w"
+        self.map_settings_button = ctk.CTkButton(
+            controls,
+            text="Show Map Settings",
+            command=self._toggle_map_settings,
+            **self._button_style(secondary=True),
         )
-        self._build_profile_picker(controls, 11)
+        self.map_settings_button.grid(row=4, column=0, padx=14, pady=(2, 12), sticky="ew")
+
+        self.map_settings_frame = ctk.CTkFrame(controls, fg_color="transparent")
+        self.map_settings_frame.grid_columnconfigure(0, weight=1)
+        self._build_monitor_picker(self.map_settings_frame, 0)
+        self._slider(self.map_settings_frame, 2, "Opacity", self.config.overlay.opacity, 0.2, 1.0, self._set_opacity)
+        self._slider(self.map_settings_frame, 3, "Size", self.config.overlay.size, 120, 720, self._set_size)
+        self._slider(self.map_settings_frame, 4, "Zoom", self.config.overlay.zoom, 0.4, 2.4, self._set_zoom)
+        self._slider(self.map_settings_frame, 5, "Corner radius", self.config.overlay.corner_radius, 0, 80, self._set_radius)
+        self._slider(self.map_settings_frame, 6, "Animation speed", self.config.overlay.animation_speed, 0.25, 3.0, self._set_animation_speed)
+        self.rotate_var = tk.BooleanVar(value=self.config.overlay.rotate_with_minimap)
+        ctk.CTkSwitch(self.map_settings_frame, text="Minimap rotation ready", variable=self.rotate_var, command=self._set_rotation, **self._switch_style()).grid(
+            row=7, column=0, padx=14, pady=16, sticky="w"
+        )
+        self._build_profile_picker(self.map_settings_frame, 8)
+        self._apply_map_settings_visibility()
 
     def _build_profile_picker(self, parent: ctk.CTkFrame, row: int) -> None:
         box = ctk.CTkFrame(parent, fg_color=COLORS["panel_dark"], border_width=1, border_color=COLORS["border"])
@@ -313,7 +326,7 @@ class OverlayApp:
         box.grid(row=row, column=0, padx=14, pady=10, sticky="ew")
         box.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(box, text="Position", font=ctk.CTkFont(weight="bold"), text_color=COLORS["text"]).grid(row=0, column=0, padx=12, pady=(12, 6), sticky="w")
-        self.position_canvas = tk.Canvas(box, height=160, bg=COLORS["bg"], highlightthickness=0, cursor="hand2")
+        self.position_canvas = tk.Canvas(box, height=320, bg=COLORS["bg"], highlightthickness=0, cursor="hand2")
         self.position_canvas.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
         self.position_canvas.bind("<Button-1>", self._position_canvas_click)
         self.position_canvas.bind("<Configure>", lambda _event: self._draw_position_canvas())
@@ -488,6 +501,21 @@ class OverlayApp:
         self.config.map_library_visible = not self.config.map_library_visible
         self._apply_map_library_visibility()
         self._save_later()
+
+    def _toggle_map_settings(self) -> None:
+        self.map_settings_visible = not self.map_settings_visible
+        self._apply_map_settings_visibility()
+
+    def _apply_map_settings_visibility(self) -> None:
+        if self.map_settings_frame:
+            if self.map_settings_visible:
+                self.map_settings_frame.grid(row=5, column=0, sticky="ew")
+            else:
+                self.map_settings_frame.grid_remove()
+        if self.map_settings_button:
+            self.map_settings_button.configure(
+                text="Hide Map Settings" if self.map_settings_visible else "Show Map Settings"
+            )
 
     def _apply_map_library_visibility(self) -> None:
         visible = self.config.map_library_visible
