@@ -365,11 +365,17 @@ class OcrRegionWindow:
         self.canvas = tk.Canvas(self.window, bg=TRANSPARENT_COLOR, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True)
         self._hide_id: str | None = None
+        self._countdown_id: str | None = None
+        self._countdown_text_id: int | None = None
+        self._remaining_seconds = 0
 
     def show(self, region: list[int], seconds: int = 8) -> None:
         if self._hide_id:
             self.root.after_cancel(self._hide_id)
             self._hide_id = None
+        if self._countdown_id:
+            self.root.after_cancel(self._countdown_id)
+            self._countdown_id = None
         left, top, width, height = [max(0, int(value)) for value in region]
         if width <= 0 or height <= 0:
             self.logger.warning("Cannot show OCR region: width and height must be greater than zero")
@@ -395,18 +401,54 @@ class OcrRegionWindow:
             outline="#111827",
             width=1,
         )
+        self._remaining_seconds = max(1, int(seconds))
+        label_width = min(max(150, width - 24), 230)
+        self.canvas.create_rectangle(
+            width / 2 - label_width / 2,
+            5,
+            width / 2 + label_width / 2,
+            31,
+            fill="#111827",
+            outline="#00E5FF",
+            width=1,
+        )
+        self._countdown_text_id = self.canvas.create_text(
+            width / 2,
+            18,
+            text="",
+            fill="#FFFFFF",
+            font=("Segoe UI", 10, "bold"),
+        )
+        self._update_countdown()
         self.window.deiconify()
         self.window.lift()
         self.window.attributes("-topmost", True)
-        self._hide_id = self.root.after(max(1, seconds) * 1000, self.hide)
+        self._hide_id = self.root.after(self._remaining_seconds * 1000, self.hide)
         self.logger.info("Showing OCR scan region at left=%s top=%s width=%s height=%s", left, top, width, height)
 
+    def _update_countdown(self) -> None:
+        self._countdown_id = None
+        if self._countdown_text_id is None or self._remaining_seconds <= 0:
+            return
+        self.canvas.itemconfigure(self._countdown_text_id, text=f"OCR scan box: {self._remaining_seconds}s")
+        self._remaining_seconds -= 1
+        if self._remaining_seconds > 0:
+            self._countdown_id = self.root.after(1000, self._update_countdown)
+
     def hide(self) -> None:
+        if self._countdown_id:
+            self.root.after_cancel(self._countdown_id)
+            self._countdown_id = None
         self._hide_id = None
+        self._countdown_text_id = None
+        self._remaining_seconds = 0
         self.window.withdraw()
 
     def stop(self) -> None:
         if self._hide_id:
             self.root.after_cancel(self._hide_id)
             self._hide_id = None
+        if self._countdown_id:
+            self.root.after_cancel(self._countdown_id)
+            self._countdown_id = None
         self.window.destroy()

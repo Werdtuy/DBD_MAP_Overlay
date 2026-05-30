@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.14
+
+- Added a remaining-time countdown over the temporary OCR scan box.
+
 ## Beta 1.13
 
 - Added the configured toggle-overlay hotkey to the live preview header.
