@@ -30,12 +30,12 @@ Tesseract must be installed separately. If it is not on `PATH`, set its executab
 
 ## Project Layout
 
-- `Build.bat` builds the overlay and updater executables
+- `Build.bat` builds the overlay executable
 - `assets/` contains the app icon and bundled visual assets
 - `dbd_overlay/` contains the application code
 - `scripts/` contains the development launcher and build helper scripts
 - `Maps/`, `config/`, `logs/`, and `plugins/` are runtime folders used beside the app
-- `build/`, `DBDCompanionOverlay.exe`, and `DBDCompanionUpdater.exe` are generated build output
+- `build/` and `DBDCompanionOverlay.exe` are generated build output
 
 ## Hens Callout Maps
 
@@ -51,7 +51,7 @@ To build a fresh Windows `.exe` for usage:
 Build.bat
 ```
 
-The script installs PyInstaller if needed and builds `DBDCompanionOverlay.exe` and `DBDCompanionUpdater.exe` directly in this project folder. It also creates `release/DBDCompanionOverlay.zip`, which is the file to share. The zip includes both executables plus empty `Maps/` and `config/` folders; the app will populate missing Hens maps from the web on first startup.
+The script installs PyInstaller if needed and builds `DBDCompanionOverlay.exe` directly in this project folder. It also creates `release/DBDCompanionOverlay.zip`, which is the file to share. The zip includes the app plus empty `Maps/` and `config/` folders; the app will populate missing Hens maps from the web on first startup.
 
 By default, the app is built without the black console window. If you need to debug a launch problem, build with a visible console:
 
@@ -63,10 +63,8 @@ Startup crashes are also written to `startup_error.log` beside the executable.
 
 Global hotkeys may require running the packaged app as administrator depending on your Windows configuration.
 
-## Automatic Updates
+## Updates
 
-Keep `DBDCompanionUpdater.exe` in the same folder as `DBDCompanionOverlay.exe`. When the packaged overlay opens, the updater checks the GitHub `latest-beta` release quietly in the background. If an update exists, it downloads the new package, waits for the overlay to close, installs the update, and opens the updated app.
-
-The top status bar shows the running beta version. Use **Check for Updates** there to see whether a newer package is available.
+The updater is integrated into `DBDCompanionOverlay.exe`. The app does not check or install updates automatically. The top status bar shows the running beta version. Use **Check for Updates** there when you want to look for a newer package. If one exists, the app shows its changelog and lets you choose **Update** or **Not Now**.
 
 The GitHub Actions workflow publishes a new `latest-beta` package after updates are pushed to `main`. Anonymous updates require the GitHub repository to be public. For a private repository, create `updater_config.json` beside the executables and set `github_token`, or set the `DBD_OVERLAY_GITHUB_TOKEN` environment variable. Do not distribute a personal token inside a shared zip.

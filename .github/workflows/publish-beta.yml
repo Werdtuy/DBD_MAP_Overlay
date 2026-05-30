@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build overlay and updater
+      - name: Build overlay
         run: python scripts/build.py -Windowed
 
       - name: Read package version

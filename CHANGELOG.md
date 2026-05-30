@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.3
+
+- Integrated updates into the main app and removed the separate updater executable.
+- Removed automatic startup update checks.
+- Added an update confirmation dialog with the new version changelog and `Update` or `Not Now` choices.
+
 ## Beta 1.21
 
 - Added the running app version to a persistent top status bar.

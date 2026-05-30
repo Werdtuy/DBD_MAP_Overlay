@@ -29,10 +29,8 @@ def write_startup_error(exc: BaseException) -> None:
 def main() -> int:
     try:
         from .app import OverlayApp
-        from .updater_launch import launch_packaged_updater
 
         root = app_root()
-        launch_packaged_updater(root)
         app = OverlayApp(root)
         app.run()
     except Exception as exc:  # pragma: no cover - startup safety net

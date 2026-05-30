@@ -26,7 +26,7 @@ from .ocr_region import active_ocr_region, compute_auto_ocr_region
 from .overlay import OcrRegionWindow, OverlayWindow, PreviewRenderer
 from .plugins import PluginManager
 from .tesseract import is_tesseract_path, tesseract_search_report
-from .update_status import AppUpdateStatus, check_for_app_update
+from .update_status import AppUpdateStatus, check_for_app_update, stage_app_update
 from .updates import MapUpdateChecker
 
 
@@ -97,6 +97,7 @@ class OverlayApp:
         self.map_settings_frame: ctk.CTkFrame | None = None
         self.map_settings_button: ctk.CTkButton | None = None
         self.map_settings_visible = False
+        self.app_update_dialog: ctk.CTkToplevel | None = None
 
         self._build_ui()
         self._save_now()
@@ -1241,13 +1242,90 @@ class OverlayApp:
         self.app_update_button.configure(state="normal", text="Check for Updates")
         if status.update_available:
             self.app_update_status_label.configure(
-                text=f"Update available: {status.latest_version}. It will install after the app closes.",
+                text=f"Update available: {status.latest_version}",
                 text_color=COLORS["accent_hover"],
             )
             self.logger.info("App update available: %s", status.latest_version)
+            self._show_app_update_dialog(status)
             return
         self.app_update_status_label.configure(text=f"Up to date: {status.current_version}", text_color=COLORS["muted"])
         self.logger.info("App is up to date: %s", status.current_version)
+
+    def _show_app_update_dialog(self, status: AppUpdateStatus) -> None:
+        if self.app_update_dialog and self.app_update_dialog.winfo_exists():
+            self.app_update_dialog.destroy()
+
+        dialog = ctk.CTkToplevel(self.root)
+        self.app_update_dialog = dialog
+        dialog.title(f"Update Available - {status.latest_version}")
+        dialog.geometry("620x470")
+        dialog.minsize(520, 380)
+        dialog.configure(fg_color=COLORS["bg"])
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(2, weight=1)
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"{status.latest_version} is available",
+            font=ctk.CTkFont(size=22, weight="bold"),
+            text_color=COLORS["text"],
+        ).grid(row=0, column=0, padx=20, pady=(20, 4), sticky="w")
+        ctk.CTkLabel(
+            dialog,
+            text=f"You are currently running {status.current_version}. Review the changes before updating.",
+            text_color=COLORS["muted"],
+        ).grid(row=1, column=0, padx=20, pady=(0, 12), sticky="w")
+
+        changelog = ctk.CTkTextbox(
+            dialog,
+            fg_color=COLORS["panel_dark"],
+            border_width=1,
+            border_color=COLORS["border"],
+            text_color=COLORS["text"],
+            wrap="word",
+        )
+        changelog.grid(row=2, column=0, padx=20, pady=(0, 14), sticky="nsew")
+        changelog.insert("1.0", status.changelog)
+        changelog.configure(state="disabled")
+
+        buttons = ctk.CTkFrame(dialog, fg_color="transparent")
+        buttons.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="e")
+        ctk.CTkButton(
+            buttons,
+            text="Not Now",
+            width=110,
+            command=dialog.destroy,
+            **self._button_style(secondary=True),
+        ).grid(row=0, column=0, padx=(0, 10))
+        ctk.CTkButton(
+            buttons,
+            text="Update",
+            width=110,
+            command=lambda: self._install_app_update(status, dialog),
+            **self._button_style(),
+        ).grid(row=0, column=1)
+
+    def _install_app_update(self, status: AppUpdateStatus, dialog: ctk.CTkToplevel) -> None:
+        dialog.destroy()
+        self.app_update_button.configure(state="disabled", text="Downloading...")
+        self.app_update_status_label.configure(text=f"Downloading {status.latest_version}...", text_color=COLORS["muted"])
+
+        def worker() -> None:
+            try:
+                stage_app_update(self.root_path, status, os.getpid())
+            except Exception as exc:
+                self.root.after(0, lambda error=exc: self._show_app_update_error(error))
+                return
+            self.root.after(0, lambda: self._finish_app_update_install(status))
+
+        threading.Thread(target=worker, name="AppUpdateDownload", daemon=True).start()
+
+    def _finish_app_update_install(self, status: AppUpdateStatus) -> None:
+        self.app_update_status_label.configure(text=f"Installing {status.latest_version}...", text_color=COLORS["muted"])
+        self.logger.info("Installing app update: %s", status.latest_version)
+        self.root.after(300, self.close)
 
     def _show_app_update_error(self, error: Exception) -> None:
         self.app_update_button.configure(state="normal", text="Check for Updates")

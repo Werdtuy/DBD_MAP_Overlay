@@ -14,7 +14,6 @@ from pathlib import Path
 
 
 APP_NAME = "DBDCompanionOverlay"
-UPDATER_NAME = "DBDCompanionUpdater"
 DEFAULT_UPDATER_CONFIG = {
     "repository": "Werdtuy/DBD_MAPoverlay",
     "release_tag": "latest-beta",
@@ -57,7 +56,22 @@ def refresh_shell_icons() -> None:
         print(f"Could not refresh Explorer icon cache: {exc}", flush=True)
 
 
-def create_release_zip(root: Path, exe_path: Path, updater_path: Path, manifest: dict[str, str]) -> Path:
+def release_notes(changelog_path: Path, version: str) -> str:
+    heading = f"## {version}"
+    lines = changelog_path.read_text(encoding="utf-8").splitlines()
+    try:
+        start = lines.index(heading) + 1
+    except ValueError:
+        return "No release notes were provided."
+    notes = []
+    for line in lines[start:]:
+        if line.startswith("## "):
+            break
+        notes.append(line)
+    return "\n".join(notes).strip() or "No release notes were provided."
+
+
+def create_release_zip(root: Path, exe_path: Path, manifest: dict[str, str]) -> Path:
     release_dir = root / "release"
     package_dir = release_dir / APP_NAME
     zip_path = release_dir / f"{APP_NAME}.zip"
@@ -67,7 +81,6 @@ def create_release_zip(root: Path, exe_path: Path, updater_path: Path, manifest:
     package_dir.mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(exe_path, package_dir / exe_path.name)
-    shutil.copy2(updater_path, package_dir / updater_path.name)
     (package_dir / "updater_config.json").write_text(
         json.dumps(DEFAULT_UPDATER_CONFIG, indent=2),
         encoding="utf-8",
@@ -84,7 +97,7 @@ def create_release_zip(root: Path, exe_path: Path, updater_path: Path, manifest:
                 "",
                 "1. Run DBDCompanionOverlay.exe.",
                 "2. The app will create settings and download missing Hens maps on first startup.",
-                "3. DBDCompanionUpdater.exe checks GitHub for updates automatically when the app starts.",
+                "3. Use Check for Updates in the app header when you want to review and install an update.",
                 "4. Install Tesseract OCR separately if OCR does not work.",
                 "5. Windows may warn about unsigned apps. Allow the app if you trust the sender.",
                 "",
@@ -116,23 +129,22 @@ def main() -> int:
     root = Path(__file__).resolve().parent.parent
     build_dir = root / "build"
     exe_path = root / f"{APP_NAME}.exe"
-    updater_path = root / f"{UPDATER_NAME}.exe"
     run_py = root / "scripts" / "run.py"
-    updater_py = root / "scripts" / "updater.py"
     assets_dir = root / "assets"
     icon_path = assets_dir / "app_icon.ico"
     app_version = str(runpy.run_path(str(root / "dbd_overlay" / "__init__.py"))["__version__"])
-    manifest = {"version": app_version}
+    manifest = {
+        "version": app_version,
+        "changelog": release_notes(root / "CHANGELOG.md", app_version),
+    }
 
     if not run_py.exists():
         raise FileNotFoundError(f"Could not find {run_py}")
-    if not updater_py.exists():
-        raise FileNotFoundError(f"Could not find {updater_py}")
     if not icon_path.exists():
         raise FileNotFoundError(f"Could not find app icon: {icon_path}")
 
     remove_existing_exe(exe_path)
-    remove_existing_exe(updater_path)
+    remove_existing_exe(root / "DBDCompanionUpdater.exe")
 
     print(f"Using Python: {sys.executable}", flush=True)
     print("Installing/updating PyInstaller and app requirements...", flush=True)
@@ -177,28 +189,6 @@ def main() -> int:
 
     print(f"Building {APP_NAME}.exe...", flush=True)
     run(pyinstaller_args)
-
-    updater_pyinstaller_args = [
-        sys.executable,
-        "-m",
-        "PyInstaller",
-        "--noconfirm",
-        "--clean",
-        window_mode,
-        "--onefile",
-        "--name",
-        UPDATER_NAME,
-        "--distpath",
-        str(root),
-        "--workpath",
-        str(build_dir),
-        "--specpath",
-        str(build_dir),
-        f"--icon={icon_path}",
-        str(updater_py),
-    ]
-    print(f"Building {UPDATER_NAME}.exe...", flush=True)
-    run(updater_pyinstaller_args)
     refresh_shell_icons()
 
     (root / "Maps").mkdir(exist_ok=True)
@@ -212,8 +202,7 @@ def main() -> int:
     print("", flush=True)
     print("Build complete:", flush=True)
     print(exe_path, flush=True)
-    print(updater_path, flush=True)
-    zip_path = create_release_zip(root, exe_path, updater_path, manifest)
+    zip_path = create_release_zip(root, exe_path, manifest)
     print("", flush=True)
     print("Shareable zip created:", flush=True)
     print(zip_path, flush=True)
