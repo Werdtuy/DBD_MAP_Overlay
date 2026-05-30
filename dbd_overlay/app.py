@@ -9,7 +9,7 @@ import shutil
 import sys
 import threading
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -1343,6 +1343,12 @@ class OverlayApp:
     def _finish_app_update_install(self, status: AppUpdateStatus) -> None:
         self.app_update_status_label.configure(text=f"Installing {status.latest_version}...", text_color=COLORS["muted"])
         self.logger.info("Installing app update: %s", status.latest_version)
+        messagebox.showinfo(
+            "Update Ready",
+            f"{status.latest_version} has been downloaded.\n\n"
+            "The app will close to finish installing the update. Reopen it after a few seconds.",
+            parent=self.root,
+        )
         self.root.after(300, self.close)
 
     def _show_app_update_error(self, error: Exception) -> None:

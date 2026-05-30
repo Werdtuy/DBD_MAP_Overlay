@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.35
+
+- Fixed integrated updates by finishing installation after the app closes and asking the user to reopen it manually.
+- Added a retry loop while replacing the executable so the installer waits until Windows releases the old packaged app.
+
 ## Beta 1.34
 
 - Fixed the post-update relaunch so the new app does not inherit a removed PyInstaller temporary runtime folder.

@@ -65,6 +65,6 @@ Global hotkeys may require running the packaged app as administrator depending o
 
 ## Updates
 
-The updater is integrated into `DBDCompanionOverlay.exe`. The app does not check or install updates automatically. The top status bar shows the running beta version. Use **Check for Updates** there when you want to look for a newer package. If one exists, the app shows its changelog and lets you choose **Update** or **Not Now**.
+The updater is integrated into `DBDCompanionOverlay.exe`. The app does not check or install updates automatically. The top status bar shows the running beta version. Use **Check for Updates** there when you want to look for a newer package. If one exists, the app shows its changelog and lets you choose **Update** or **Not Now**. After accepting an update, reopen the app once it closes.
 
 The GitHub Actions workflow publishes a new `latest-beta` package after updates are pushed to `main`. Anonymous updates require the GitHub repository to be public. For a private repository, create `updater_config.json` beside the executables and set `github_token`, or set the `DBD_OVERLAY_GITHUB_TOKEN` environment variable. Do not distribute a personal token inside a shared zip.

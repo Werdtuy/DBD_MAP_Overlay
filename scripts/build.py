@@ -120,7 +120,7 @@ def create_release_zip(root: Path, exe_path: Path, manifest: dict[str, str]) -> 
                 "",
                 "1. Run DBDCompanionOverlay.exe.",
                 "2. The app will create settings and download missing Hens maps on first startup.",
-                "3. Use Check for Updates in the app header when you want to review and install an update.",
+                "3. Use Check for Updates in the app header when you want to review and install an update. Reopen the app once it closes.",
                 "4. Install Tesseract OCR separately if OCR does not work.",
                 "5. Windows may warn about unsigned apps. Allow the app if you trust the sender.",
                 "",

@@ -172,32 +172,28 @@ def stage_app_update(app_dir: Path, status: AppUpdateStatus, app_pid: int) -> No
                     ":wait_for_app",
                     f'tasklist /FI "PID eq {app_pid}" 2>NUL | find "{app_pid}" >NUL',
                     "if not errorlevel 1 (",
-                    "  timeout /T 1 /NOBREAK >NUL",
+                    "  ping 127.0.0.1 -n 2 >NUL",
                     "  goto wait_for_app",
                     ")",
-                    f'copy /Y "{source_exe}" "{app_path}" >NUL',
+                    "ping 127.0.0.1 -n 3 >NUL",
+                    ":replace_app",
+                    f'copy /Y "{source_exe}" "{app_path}.update" >NUL',
+                    f'move /Y "{app_path}.update" "{app_path}" >NUL',
+                    "if errorlevel 1 (",
+                    "  ping 127.0.0.1 -n 2 >NUL",
+                    "  goto replace_app",
+                    ")",
                     f'copy /Y "{source_version}" "{app_dir / "version.json"}" >NUL',
-                    "timeout /T 2 /NOBREAK >NUL",
-                    'set "PYINSTALLER_RESET_ENVIRONMENT=1"',
-                    f'start "" "{app_path}"',
-                    'cd /D "%TEMP%"',
-                    f'rmdir /S /Q "{staging_dir}"',
+                    f'start "" /B cmd.exe /D /S /C "ping 127.0.0.1 -n 3 >NUL & rmdir /S /Q ""{staging_dir}"" 2>NUL"',
                 ]
             ),
             encoding="utf-8",
         )
-        clean_env = {
-            key: value
-            for key, value in os.environ.items()
-            if not key.upper().startswith("_PYI")
-        }
-        clean_env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
         subprocess.Popen(
             ["cmd.exe", "/d", "/s", "/c", str(script_path)],
             cwd=str(app_dir),
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             close_fds=True,
-            env=clean_env,
         )
     except Exception:
         shutil.rmtree(staging_dir, ignore_errors=True)
