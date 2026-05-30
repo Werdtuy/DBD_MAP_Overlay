@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -19,6 +21,17 @@ DEFAULT_CONFIG = {
     "github_token": "",
 }
 APP_EXE = "DBDCompanionOverlay.exe"
+BETA_VERSION_PATTERN = re.compile(r"^\s*beta\s+(\d+(?:\.\d+)?)\s*$", re.IGNORECASE)
+
+
+def parse_beta_version(version: str) -> Decimal | None:
+    match = BETA_VERSION_PATTERN.match(version)
+    if not match:
+        return None
+    try:
+        return Decimal(match.group(1))
+    except InvalidOperation:
+        return None
 
 
 @dataclass(frozen=True)
@@ -31,7 +44,11 @@ class AppUpdateStatus:
 
     @property
     def update_available(self) -> bool:
-        return self.latest_version != self.current_version
+        current = parse_beta_version(self.current_version)
+        latest = parse_beta_version(self.latest_version)
+        if current is None or latest is None:
+            return False
+        return latest > current
 
 
 def load_updater_config(app_dir: Path) -> dict[str, str]:

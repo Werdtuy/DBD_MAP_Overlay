@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.31
+
+- Fixed update checks so only versions newer than the running app are shown.
+
 ## Beta 1.3
 
 - Integrated updates into the main app and removed the separate updater executable.
