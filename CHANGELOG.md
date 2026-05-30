@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.34
+
+- Fixed the post-update relaunch so the new app does not inherit a removed PyInstaller temporary runtime folder.
+- Added a short relaunch delay and a build check that blocks incomplete runtime packages from being published.
+
 ## Beta 1.33
 
 - Added official Tesseract OCR links to the README setup section.

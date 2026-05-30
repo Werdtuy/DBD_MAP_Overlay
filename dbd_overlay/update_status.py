@@ -177,6 +177,8 @@ def stage_app_update(app_dir: Path, status: AppUpdateStatus, app_pid: int) -> No
                     ")",
                     f'copy /Y "{source_exe}" "{app_path}" >NUL',
                     f'copy /Y "{source_version}" "{app_dir / "version.json"}" >NUL',
+                    "timeout /T 2 /NOBREAK >NUL",
+                    'set "PYINSTALLER_RESET_ENVIRONMENT=1"',
                     f'start "" "{app_path}"',
                     'cd /D "%TEMP%"',
                     f'rmdir /S /Q "{staging_dir}"',
@@ -184,11 +186,18 @@ def stage_app_update(app_dir: Path, status: AppUpdateStatus, app_pid: int) -> No
             ),
             encoding="utf-8",
         )
+        clean_env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.upper().startswith("_PYI")
+        }
+        clean_env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
         subprocess.Popen(
             ["cmd.exe", "/d", "/s", "/c", str(script_path)],
             cwd=str(app_dir),
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             close_fds=True,
+            env=clean_env,
         )
     except Exception:
         shutil.rmtree(staging_dir, ignore_errors=True)

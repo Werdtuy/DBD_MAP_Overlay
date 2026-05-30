@@ -14,6 +14,7 @@ from pathlib import Path
 
 
 APP_NAME = "DBDCompanionOverlay"
+WINDOWS_RUNTIME_DLLS = ("vcruntime140.dll", "vcruntime140_1.dll")
 DEFAULT_UPDATER_CONFIG = {
     "repository": "Werdtuy/DBD_MAPoverlay",
     "release_tag": "latest-beta",
@@ -54,6 +55,28 @@ def refresh_shell_icons() -> None:
         print("Requested Windows Explorer icon refresh.", flush=True)
     except Exception as exc:
         print(f"Could not refresh Explorer icon cache: {exc}", flush=True)
+
+
+def windows_runtime_dlls() -> list[Path]:
+    if sys.platform != "win32":
+        return []
+    python_dir = Path(sys.executable).resolve().parent
+    dlls = [python_dir / name for name in WINDOWS_RUNTIME_DLLS]
+    missing = [str(path) for path in dlls if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"Could not find required Windows runtime DLLs: {', '.join(missing)}")
+    return dlls
+
+
+def verify_exe_payload(exe_path: Path) -> None:
+    from PyInstaller.archive.readers import CArchiveReader
+
+    names = {name.lower() for name in CArchiveReader(str(exe_path)).toc}
+    expected = {"python312.dll", *WINDOWS_RUNTIME_DLLS}
+    missing = sorted(name for name in expected if name not in names)
+    if missing:
+        raise RuntimeError(f"Built executable is missing required runtime files: {', '.join(missing)}")
+    print(f"Verified bundled runtime files: {', '.join(sorted(expected))}", flush=True)
 
 
 def release_notes(changelog_path: Path, version: str) -> str:
@@ -188,12 +211,15 @@ def main() -> int:
     ]
     if assets_dir.exists():
         pyinstaller_args.extend(["--add-data", f"{assets_dir}{os.pathsep}assets"])
+    for runtime_dll in windows_runtime_dlls():
+        pyinstaller_args.extend(["--add-binary", f"{runtime_dll}{os.pathsep}."])
     print(f"Using icon: {icon_path}", flush=True)
     pyinstaller_args.append(f"--icon={icon_path}")
     pyinstaller_args.append(str(run_py))
 
     print(f"Building {APP_NAME}.exe...", flush=True)
     run(pyinstaller_args)
+    verify_exe_payload(exe_path)
     refresh_shell_icons()
 
     (root / "Maps").mkdir(exist_ok=True)
