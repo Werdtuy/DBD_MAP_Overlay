@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.13
+
+- Added the configured toggle-overlay hotkey to the live preview header.
+- Replaced the map placement dots with larger coordinate-labeled selection boxes.
+
 ## Beta 1.12
 
 - Removed the public beta versioning explanation.

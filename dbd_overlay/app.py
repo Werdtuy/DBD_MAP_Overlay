@@ -261,14 +261,23 @@ class OverlayApp:
         preview_card.grid(row=0, column=0, rowspan=2, padx=(0, 12), pady=12, sticky="nsew")
         preview_card.grid_columnconfigure(0, weight=1)
         preview_card.grid_rowconfigure(1, weight=1)
+        preview_header = ctk.CTkFrame(preview_card, fg_color="transparent")
+        preview_header.grid(row=0, column=0, padx=18, pady=(18, 8), sticky="ew")
+        preview_header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            preview_card,
+            preview_header,
             text="Live Preview",
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color=COLORS["text"],
         ).grid(
-            row=0, column=0, padx=18, pady=(18, 8), sticky="w"
+            row=0, column=0, sticky="w"
         )
+        self.preview_toggle_hotkey_label = ctk.CTkLabel(
+            preview_header,
+            text=self._toggle_overlay_hotkey_text(),
+            text_color=COLORS["muted"],
+        )
+        self.preview_toggle_hotkey_label.grid(row=0, column=1, padx=(12, 0), sticky="e")
         self.preview_label = tk.Label(preview_card, text="No map selected", bg=COLORS["panel_dark"], fg=COLORS["muted"], bd=0)
         self.preview_label.grid(row=1, column=0, padx=18, pady=(0, 18), sticky="nsew")
         self.preview = PreviewRenderer(self.preview_label, self.config)
@@ -642,32 +651,33 @@ class OverlayApp:
         margin = 18
         canvas.create_rectangle(margin, margin, width - margin, height - margin, outline=COLORS["border"], width=2)
         selected_row, selected_col = self._selected_position_grid()
-        dot = 24
-        left = margin + 12
-        top = margin + 12
-        right = width - margin - 12
-        bottom = height - margin - 12
+        box_width = 48
+        box_height = 36
+        left = margin + box_width / 2
+        top = margin + box_height / 2
+        right = width - margin - box_width / 2
+        bottom = height - margin - box_height / 2
         for row, col in self._edge_position_points():
             cx = left + (right - left) * col / 3
             cy = top + (bottom - top) * row / 3
             selected = row == selected_row and col == selected_col
-            px = cx - dot / 2
-            py = cy - dot / 2
-            canvas.create_text(
-                cx,
-                cy + dot,
-                text=f"{row + 1},{col + 1}",
-                fill=COLORS["muted"],
-                font=("Segoe UI", 7),
-            )
-            canvas.create_oval(
+            px = cx - box_width / 2
+            py = cy - box_height / 2
+            canvas.create_rectangle(
                 px,
                 py,
-                px + dot,
-                py + dot,
-                fill=(COLORS["accent"] if selected else COLORS["input"]),
+                px + box_width,
+                py + box_height,
+                fill=(COLORS["accent_dark"] if selected else COLORS["input"]),
                 outline=COLORS["accent"] if selected else COLORS["border"],
-                width=2,
+                width=3 if selected else 2,
+            )
+            canvas.create_text(
+                cx,
+                cy,
+                text=f"{row + 1},{col + 1}",
+                fill=COLORS["text"] if selected else COLORS["muted"],
+                font=("Segoe UI", 9, "bold"),
             )
         if hasattr(self, "position_label"):
             self.position_label.configure(text=f"Selected: Row {selected_row + 1}, Column {selected_col + 1}")
@@ -715,10 +725,12 @@ class OverlayApp:
         width = max(self.position_canvas.winfo_width(), 1)
         height = max(self.position_canvas.winfo_height(), 1)
         margin = 18
-        left = margin + 12
-        top = margin + 12
-        right = width - margin - 12
-        bottom = height - margin - 12
+        box_width = 48
+        box_height = 36
+        left = margin + box_width / 2
+        top = margin + box_height / 2
+        right = width - margin - box_width / 2
+        bottom = height - margin - box_height / 2
         points = {}
         for row, col in self._edge_position_points():
             x = left + (right - left) * col / 3
@@ -850,6 +862,7 @@ class OverlayApp:
             self.profile_menu.configure(values=[profile.name for profile in self.config.profiles])
             self.profile_menu.set(self.config.active_profile)
         self._refresh_force_update_labels()
+        self._refresh_toggle_overlay_hotkey_label()
 
         self._apply_performance_timer_state()
         self._apply_map_library_visibility()
@@ -1082,6 +1095,8 @@ class OverlayApp:
         setattr(self.config.hotkeys, key, self.hotkey_entries[key].get().strip())
         if key == "force_update_map":
             self._refresh_force_update_labels()
+        elif key == "toggle_overlay":
+            self._refresh_toggle_overlay_hotkey_label()
         self._save_later()
 
     def _apply_hotkeys_from_ui(self) -> None:
@@ -1097,6 +1112,14 @@ class OverlayApp:
     def _refresh_force_update_labels(self) -> None:
         if hasattr(self, "force_update_button"):
             self.force_update_button.configure(text=self._force_update_button_text())
+
+    def _toggle_overlay_hotkey_text(self) -> str:
+        hotkey = self.config.hotkeys.toggle_overlay.strip()
+        return f"Toggle Overlay: {hotkey.upper()}" if hotkey else "Toggle Overlay: Not set"
+
+    def _refresh_toggle_overlay_hotkey_label(self) -> None:
+        if hasattr(self, "preview_toggle_hotkey_label"):
+            self.preview_toggle_hotkey_label.configure(text=self._toggle_overlay_hotkey_text())
 
     def _add_map(self) -> None:
         paths = filedialog.askopenfilenames(
