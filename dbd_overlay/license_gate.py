@@ -15,6 +15,7 @@ import winreg
 
 import customtkinter as ctk
 
+from .secure_config import decrypt_server_url
 
 LICENSE_CONFIG_FILE = "license_config.json"
 LICENSE_STATE_FILE = "license.json"
@@ -89,12 +90,10 @@ class LicenseStore:
             config_paths.append(Path(bundled_dir) / LICENSE_CONFIG_FILE)
         for config_path in config_paths:
             try:
-                payload = json.loads(config_path.read_text(encoding="utf-8"))
-                url = str(payload["server_url"]).strip().rstrip("/")
+                url = decrypt_server_url(config_path.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            if url.startswith("https://"):
-                return url
+            return url
         raise RuntimeError("The activation service configuration is missing. Reinstall the app package.")
 
     def load_key(self) -> str:

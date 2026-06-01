@@ -8,7 +8,6 @@ release/
 DBDCompanionOverlay.exe
 startup_error.log
 updater_config.json
-license_config.json
 version.json
 update_manifest.json
 logs/

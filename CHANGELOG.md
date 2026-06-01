@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.7
+
+- Replaced the plaintext activation sidecar with a tracked encrypted `license_config.json`.
+- Made downloaded source packages self-contained so `Build.bat` works without private setup files.
+- Shipped and embedded only the encrypted activation configuration in release builds.
+
 ## Beta 1.61
 
 - Added a first-run private activation-URL prompt to `Build.bat` when the ignored local license configuration is missing.

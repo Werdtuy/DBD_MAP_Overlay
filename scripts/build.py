@@ -13,6 +13,11 @@ import time
 import zipfile
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dbd_overlay.secure_config import decrypt_server_url, encrypt_server_url
 
 APP_NAME = "DBDCompanionOverlay"
 WINDOWS_RUNTIME_DLLS = ("vcruntime140.dll", "vcruntime140_1.dll")
@@ -104,17 +109,19 @@ def release_notes(changelog_path: Path, version: str) -> str:
     return "\n".join(notes).strip() or "No release notes were provided."
 
 
-def load_license_config(root: Path, prompt_if_missing: bool = False) -> dict[str, str]:
+def load_license_config(root: Path, prompt_if_missing: bool = False) -> str:
     server_url = os.environ.get("DBD_OVERLAY_LICENSE_SERVER_URL", "").strip()
     config_path = root / LICENSE_CONFIG_FILE
     prompted = False
     if not server_url:
         try:
-            server_url = str(json.loads(config_path.read_text(encoding="utf-8"))["server_url"]).strip()
+            encrypted_config = config_path.read_text(encoding="utf-8")
+            decrypt_server_url(encrypted_config)
+            return encrypted_config
         except Exception as exc:
             if not prompt_if_missing:
                 raise RuntimeError(
-                    "License server URL is missing. Set DBD_OVERLAY_LICENSE_SERVER_URL or add a private license_config.json."
+                    "Encrypted license server configuration is missing. Set DBD_OVERLAY_LICENSE_SERVER_URL or add license_config.json."
                 ) from exc
             print("", flush=True)
             print("Private build configuration is missing.", flush=True)
@@ -123,18 +130,18 @@ def load_license_config(root: Path, prompt_if_missing: bool = False) -> dict[str
     server_url = server_url.rstrip("/")
     if not server_url.startswith("https://"):
         raise RuntimeError("License server URL must use HTTPS.")
-    config = {"server_url": server_url}
+    encrypted_config = encrypt_server_url(server_url)
     if prompted:
-        config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+        config_path.write_text(encrypted_config, encoding="utf-8")
         print(f"Saved private ignored build configuration: {config_path}", flush=True)
-    return config
+    return encrypted_config
 
 
 def create_release_zip(
     root: Path,
     exe_path: Path,
     manifest: dict[str, str],
-    license_config: dict[str, str],
+    encrypted_license_config: str,
 ) -> Path:
     release_dir = root / "release"
     package_dir = release_dir / APP_NAME
@@ -149,7 +156,7 @@ def create_release_zip(
         json.dumps(DEFAULT_UPDATER_CONFIG, indent=2),
         encoding="utf-8",
     )
-    (package_dir / LICENSE_CONFIG_FILE).write_text(json.dumps(license_config, indent=2), encoding="utf-8")
+    (package_dir / LICENSE_CONFIG_FILE).write_text(encrypted_license_config, encoding="utf-8")
     (package_dir / "version.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (package_dir / "Maps").mkdir(exist_ok=True)
     (package_dir / "config").mkdir(exist_ok=True)
@@ -208,7 +215,7 @@ def main() -> int:
         "version": app_version,
         "changelog": release_notes(root / "CHANGELOG.md", app_version),
     }
-    license_config = load_license_config(root, prompt_if_missing=args.prompt_license_config)
+    encrypted_license_config = load_license_config(root, prompt_if_missing=args.prompt_license_config)
 
     if not run_py.exists():
         raise FileNotFoundError(f"Could not find {run_py}")
@@ -226,7 +233,7 @@ def main() -> int:
     window_mode = "--console" if args.console else "--windowed"
     bundled_config_dir = Path(tempfile.mkdtemp(prefix="dbd-overlay-build-input-"))
     bundled_license_config = bundled_config_dir / LICENSE_CONFIG_FILE
-    bundled_license_config.write_text(json.dumps(license_config, indent=2), encoding="utf-8")
+    bundled_license_config.write_text(encrypted_license_config, encoding="utf-8")
     pyinstaller_args = [
         sys.executable,
         "-m",
@@ -284,7 +291,7 @@ def main() -> int:
     print("", flush=True)
     print("Build complete:", flush=True)
     print(exe_path, flush=True)
-    zip_path = create_release_zip(root, exe_path, manifest, license_config)
+    zip_path = create_release_zip(root, exe_path, manifest, encrypted_license_config)
     print("", flush=True)
     print("Shareable zip created:", flush=True)
     print(zip_path, flush=True)
