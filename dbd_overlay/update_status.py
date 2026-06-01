@@ -23,7 +23,7 @@ DEFAULT_CONFIG = {
     "github_token": "",
 }
 APP_EXE = "DBDCompanionOverlay.exe"
-REQUIRED_PACKAGE_FILES = ("version.json", "license_config.json")
+UPDATE_SIDECAR_FILES = ("license_config.json", "updater_config.json", "version.json")
 BETA_VERSION_PATTERN = re.compile(r"^\s*beta\s+(\d+(?:\.\d+)?)\s*$", re.IGNORECASE)
 
 
@@ -180,11 +180,21 @@ def stage_app_update(app_dir: Path, status: AppUpdateStatus, app_pid: int) -> No
         _safe_extract(archive_path, extracted_dir)
         package_dir = _package_root(extracted_dir)
         source_exe = package_dir / APP_EXE
-        for name in REQUIRED_PACKAGE_FILES:
+        for name in UPDATE_SIDECAR_FILES:
             if not (package_dir / name).exists():
                 raise RuntimeError(f"Update package is missing {name}")
 
         script_path = staging_dir / "install_update.cmd"
+        sidecar_commands = []
+        for name in UPDATE_SIDECAR_FILES:
+            source = package_dir / name
+            destination = app_dir / name
+            sidecar_commands.extend(
+                [
+                    f'copy /Y "{source}" "{destination}.update" >NUL',
+                    f'move /Y "{destination}.update" "{destination}" >NUL',
+                ]
+            )
         script_path.write_text(
             "\n".join(
                 [
@@ -204,12 +214,7 @@ def stage_app_update(app_dir: Path, status: AppUpdateStatus, app_pid: int) -> No
                     "  ping 127.0.0.1 -n 2 >NUL",
                     "  goto replace_app",
                     ")",
-                    ":merge_package",
-                    f'robocopy "{package_dir}" "{app_dir}" /E /XF "{APP_EXE}" /R:5 /W:1 >NUL',
-                    "if errorlevel 8 (",
-                    "  ping 127.0.0.1 -n 2 >NUL",
-                    "  goto merge_package",
-                    ")",
+                    *sidecar_commands,
                     f'start "" /B cmd.exe /D /S /C "ping 127.0.0.1 -n 3 >NUL & rmdir /S /Q ""{staging_dir}"" 2>NUL"',
                 ]
             ),

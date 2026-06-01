@@ -51,7 +51,7 @@ To build a fresh Windows `.exe` for usage:
 Build.bat
 ```
 
-The script installs PyInstaller if needed and builds `DBDCompanionOverlay.exe` directly in this project folder. It also creates `release/DBDCompanionOverlay.zip`, which is the file to share. The zip includes the app plus empty `Maps/` and `config/` folders; the app will populate missing Hens maps from the web on first startup.
+The script installs PyInstaller if needed and builds `DBDCompanionOverlay.exe` directly in this project folder. It also creates `release/DBDCompanionOverlay.zip`, which is the file to share. The zip contains only the files required to run and update the app. Runtime folders and missing Hens maps are created automatically on first startup.
 
 By default, the app is built without the black console window. If you need to debug a launch problem, build with a visible console:
 

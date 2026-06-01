@@ -158,31 +158,6 @@ def create_release_zip(
     )
     (package_dir / LICENSE_CONFIG_FILE).write_text(encrypted_license_config, encoding="utf-8")
     (package_dir / "version.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    (package_dir / "Maps").mkdir(exist_ok=True)
-    (package_dir / "config").mkdir(exist_ok=True)
-
-    readme = package_dir / "README.txt"
-    readme.write_text(
-        "\n".join(
-            [
-                "DBD Companion Overlay",
-                "",
-                "1. Run DBDCompanionOverlay.exe.",
-                "2. The app will create settings and download missing Hens maps on first startup.",
-                "3. Use Check for Updates in the app header when you want to review and install an update. Reopen the app once it closes.",
-                "4. Install Tesseract OCR separately if OCR does not work.",
-                "5. Windows may warn about unsigned apps. Allow the app if you trust the sender.",
-                "",
-                "Default force-update hotkey: K",
-                "",
-                "Map callout credits:",
-                "Original callouts page: https://hens333.com/callouts",
-                "Images credited by the source page to Lethia.",
-                "The source page is Zexov's modified version of the original build by Broosley and Evo from Hens' Discord.",
-            ]
-        ),
-        encoding="utf-8",
-    )
 
     if zip_path.exists():
         zip_path.unlink()

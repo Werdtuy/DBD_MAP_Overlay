@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.71
+
+- Restricted in-app updates to the executable and required runtime sidecar files only.
+- Reduced shared release packages to the bare minimum needed to launch and update the app.
+
 ## Beta 1.7
 
 - Replaced the plaintext activation sidecar with a tracked encrypted `license_config.json`.
