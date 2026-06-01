@@ -42,8 +42,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             Write-Host "No previous latest-beta release exists."
           }
+          $notes = @"
+          ## Beta download
+
+          Download **DBDCompanionOverlay.zip**, extract it, and run **DBDCompanionOverlay.exe**.
+
+          This is a beta release. Use the in-app update checker to review and install future versions.
+          "@
           gh release create latest-beta release/DBDCompanionOverlay.zip update_manifest.json `
-            --title "DBD Companion Overlay $env:APP_VERSION" `
-            --notes "Automatic beta package for $env:APP_VERSION." `
+            --title "DBD Companion Overlay | $env:APP_VERSION" `
+            --notes $notes `
             --prerelease `
             --target $env:GITHUB_SHA

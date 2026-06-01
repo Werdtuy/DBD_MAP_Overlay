@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.72
+
+- Replaced public build instructions with a direct beta-package download link.
+- Added clear beta download instructions to the GitHub prerelease page.
+
 ## Beta 1.71
 
 - Restricted in-app updates to the executable and required runtime sidecar files only.
