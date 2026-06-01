@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.51
+
+- Updated the GitHub beta publisher to Node 24-compatible official actions.
+
 ## Beta 1.5
 
 - Added required license-key activation before the overlay starts.
