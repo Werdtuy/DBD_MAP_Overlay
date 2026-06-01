@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.39
+
+- Removed private deployment details from the public project files.
+
 ## Beta 1.38
 
 - Changed public update checks to use direct GitHub release downloads instead of the rate-limited anonymous GitHub API.
