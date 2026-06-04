@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.8
+
+- Added a low-overhead Windows startup watcher that opens the overlay automatically when Dead by Daylight launches.
+- Made packaged app launches open with the settings window minimized by default.
+- Updated future installs to stop the background watcher before replacing the executable.
+
 ## Beta 1.72
 
 - Replaced public build instructions with a direct beta-package download link.

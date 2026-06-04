@@ -206,6 +206,7 @@ def stage_app_update(app_dir: Path, status: AppUpdateStatus, app_pid: int) -> No
                     "  ping 127.0.0.1 -n 2 >NUL",
                     "  goto wait_for_app",
                     ")",
+                    f'taskkill /IM "{APP_EXE}" /F >NUL 2>NUL',
                     "ping 127.0.0.1 -n 3 >NUL",
                     ":replace_app",
                     f'copy /Y "{source_exe}" "{app_path}.update" >NUL',

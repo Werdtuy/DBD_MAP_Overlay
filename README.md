@@ -22,6 +22,8 @@ Download the newest beta package:
 
 Extract the zip and run `DBDCompanionOverlay.exe`.
 
+After the app has been opened once, it registers a lightweight Windows startup watcher. The watcher waits in the background and opens the overlay automatically when Dead by Daylight launches. The settings window opens minimized by default.
+
 Tesseract OCR must be installed separately. Windows installation options are listed in the [official Tesseract installation guide](https://github.com/tesseract-ocr/tessdoc/blob/main/Installation.md). If it is not found automatically, choose its executable path in the app settings.
 
 ## Hens Callout Maps

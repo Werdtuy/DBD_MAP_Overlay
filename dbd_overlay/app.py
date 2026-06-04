@@ -17,6 +17,7 @@ from PIL import Image, ImageTk
 
 from . import __version__
 from .app_logging import configure_logging
+from .auto_launch import ensure_auto_launcher, start_watcher_if_needed
 from .config import AppConfig, ConfigStore, Profile
 from .detector import DetectionResult, DetectionWorker
 from .focus import FocusGate, get_monitors
@@ -54,13 +55,16 @@ COLORS = {
 
 
 class OverlayApp:
-    def __init__(self, root_path: Path) -> None:
+    def __init__(self, root_path: Path, start_minimized: bool = False) -> None:
         self.root_path = root_path
+        self.start_minimized = start_minimized
         self.store = ConfigStore(root_path)
         self.config = self.store.load()
         self.config.map_library_visible = False
         self.logger, self.log_queue = configure_logging(root_path)
         self.logger.info("Settings imported automatically from %s", self.store.path)
+        ensure_auto_launcher(root_path, self.logger)
+        start_watcher_if_needed(root_path, self.logger)
         self._save_after: str | None = None
 
         self.library = MapLibrary(root_path, self.config.maps_dir)
@@ -117,6 +121,8 @@ class OverlayApp:
         if not self.config.detection.performance_mode:
             self._pump_logs()
             self._update_overlay_status()
+        if self.start_minimized:
+            self.root.after(300, self._minimize_gui)
         self.logger.info("App ready. Loaded %s map(s).", len(self.library.entries))
 
     def run(self) -> None:
@@ -139,6 +145,13 @@ class OverlayApp:
                 self._app_icon_photo = icon
         except Exception as exc:
             self.logger.warning("Could not set app icon: %s", exc)
+
+    def _minimize_gui(self) -> None:
+        try:
+            self.root.iconify()
+            self.logger.info("Settings window opened minimized.")
+        except Exception as exc:
+            self.logger.warning("Could not minimize settings window: %s", exc)
 
     def _button_style(self, secondary: bool = False) -> dict:
         if secondary:
