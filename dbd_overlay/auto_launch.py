@@ -66,6 +66,26 @@ def _command_for_watcher(app_exe: Path) -> str:
     return f'"{app_exe}" --watch-dbd'
 
 
+def _clean_pyinstaller_env() -> dict[str, str]:
+    env = dict(os.environ)
+    for key in list(env):
+        upper_key = key.upper()
+        if upper_key.startswith("_PYI") or upper_key == "_MEIPASS2":
+            env.pop(key, None)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
+
+
+def _spawn_app(app_exe: Path, args: list[str], root: Path) -> None:
+    subprocess.Popen(
+        [str(app_exe), *args],
+        cwd=str(root),
+        env=_clean_pyinstaller_env(),
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        close_fds=True,
+    )
+
+
 def ensure_auto_launcher(root: Path, logger: logging.Logger) -> None:
     if not _is_windows() or not getattr(sys, "frozen", False) or winreg is None:
         return
@@ -83,12 +103,7 @@ def start_watcher_if_needed(root: Path, logger: logging.Logger) -> None:
         return
     app_exe = _app_exe_path(root)
     try:
-        subprocess.Popen(
-            [str(app_exe), "--watch-dbd"],
-            cwd=str(root),
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            close_fds=True,
-        )
+        _spawn_app(app_exe, ["--watch-dbd"], root)
         logger.info("Auto-launch watcher started.")
     except Exception as exc:
         logger.warning("Could not start auto-launch watcher: %s", exc)
@@ -146,12 +161,7 @@ def run_dbd_watcher(root: Path) -> int:
                 launched_for_session = False
             elif not launched_for_session:
                 if not _is_overlay_gui_running(app_exe, own_pid=os.getpid()):
-                    subprocess.Popen(
-                        [str(app_exe), "--minimized"],
-                        cwd=str(root),
-                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                        close_fds=True,
-                    )
+                    _spawn_app(app_exe, ["--minimized"], root)
                 launched_for_session = True
             time.sleep(WATCH_INTERVAL_SECONDS)
     finally:

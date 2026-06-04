@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.81
+
+- Fixed packaged startup crashes by forcing watcher-spawned app processes to create a fresh PyInstaller runtime folder.
+
 ## Beta 1.8
 
 - Added a low-overhead Windows startup watcher that opens the overlay automatically when Dead by Daylight launches.
