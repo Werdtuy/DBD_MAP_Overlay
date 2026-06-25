@@ -48,7 +48,7 @@ def main() -> int:
         from .app import OverlayApp
 
         start_minimized = "--show" not in args and (getattr(sys, "frozen", False) or "--minimized" in args)
-        close_when_dbd_exits = "--close-when-dbd-exits" in args
+        close_when_dbd_exits = "--close-when-dbd-exits" in args or ("--minimized" in args and "--show" not in args)
         app = OverlayApp(root, start_minimized=start_minimized, close_when_dbd_exits=close_when_dbd_exits)
         app.run()
     except Exception as exc:  # pragma: no cover - startup safety net

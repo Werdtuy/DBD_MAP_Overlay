@@ -119,7 +119,8 @@ def _is_dead_by_daylight_running() -> bool:
             name = (proc.info.get("name") or "").lower()
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
-        if name in DBD_PROCESS_NAMES:
+        compact_name = "".join(character for character in name if character.isalnum())
+        if name in DBD_PROCESS_NAMES or compact_name.startswith("deadbydaylight"):
             return True
     return False
 

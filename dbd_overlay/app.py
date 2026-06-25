@@ -165,7 +165,7 @@ class OverlayApp:
                 self._game_absent_checks = 0
             else:
                 self._game_absent_checks += 1
-                if self._game_absent_checks >= 3:
+                if self._game_absent_checks >= 1:
                     self.logger.info("Dead by Daylight is no longer running. Closing overlay app.")
                     self.close()
                     return

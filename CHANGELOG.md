@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.91
+
+- Reduced Dead by Daylight exit detection to one 5-second check before closing the overlay app.
+- Treated minimized watcher-style launches as auto-close sessions for compatibility with older background watchers.
+- Made Dead by Daylight process detection more tolerant of process-name variations.
+
 ## Beta 1.9
 
 - Made watcher-launched overlay sessions close automatically after Dead by Daylight exits.
