@@ -139,6 +139,11 @@ def _same_path(left: str | None, right: Path) -> bool:
 
 
 def _is_overlay_gui_running(app_exe: Path, own_pid: int) -> bool:
+    return any(_overlay_gui_processes(app_exe, own_pid))
+
+
+def _overlay_gui_processes(app_exe: Path, own_pid: int) -> list[psutil.Process]:
+    processes = []
     for proc in _processes():
         try:
             if proc.info.get("pid") == own_pid:
@@ -147,10 +152,26 @@ def _is_overlay_gui_running(app_exe: Path, own_pid: int) -> bool:
                 continue
             cmdline = [str(part).lower() for part in (proc.info.get("cmdline") or [])]
             if "--watch-dbd" not in cmdline:
-                return True
+                processes.append(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
-    return False
+    return processes
+
+
+def _close_overlay_gui(app_exe: Path, own_pid: int) -> None:
+    processes = _overlay_gui_processes(app_exe, own_pid)
+    for proc in processes:
+        try:
+            proc.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    if processes:
+        gone, alive = psutil.wait_procs(processes, timeout=3)
+        for proc in alive:
+            try:
+                proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
 
 
 def run_dbd_watcher(root: Path) -> int:
@@ -163,6 +184,8 @@ def run_dbd_watcher(root: Path) -> int:
         while True:
             dbd_running = _is_dead_by_daylight_running()
             if not dbd_running:
+                if launched_for_session:
+                    _close_overlay_gui(app_exe, own_pid=os.getpid())
                 launched_for_session = False
             elif not launched_for_session:
                 if not _is_overlay_gui_running(app_exe, own_pid=os.getpid()):

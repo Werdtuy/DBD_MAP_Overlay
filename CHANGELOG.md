@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.92
+
+- Moved Dead by Daylight session cleanup into the background watcher so it actively closes the overlay app when the game exits.
+- Kept the watcher process alive after closing the overlay app so it can reopen the overlay next session.
+
 ## Beta 1.91
 
 - Reduced Dead by Daylight exit detection to one 5-second check before closing the overlay app.
