@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.9
+
+- Made watcher-launched overlay sessions close automatically after Dead by Daylight exits.
+- Kept the background watcher running so it can open the overlay again on the next Dead by Daylight launch.
+
 ## Beta 1.81
 
 - Fixed packaged startup crashes by forcing watcher-spawned app processes to create a fresh PyInstaller runtime folder.

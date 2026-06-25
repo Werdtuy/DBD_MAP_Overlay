@@ -124,6 +124,10 @@ def _is_dead_by_daylight_running() -> bool:
     return False
 
 
+def is_dead_by_daylight_running() -> bool:
+    return _is_dead_by_daylight_running()
+
+
 def _same_path(left: str | None, right: Path) -> bool:
     if not left:
         return False
@@ -161,7 +165,7 @@ def run_dbd_watcher(root: Path) -> int:
                 launched_for_session = False
             elif not launched_for_session:
                 if not _is_overlay_gui_running(app_exe, own_pid=os.getpid()):
-                    _spawn_app(app_exe, ["--minimized"], root)
+                    _spawn_app(app_exe, ["--minimized", "--close-when-dbd-exits"], root)
                 launched_for_session = True
             time.sleep(WATCH_INTERVAL_SECONDS)
     finally:

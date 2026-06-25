@@ -17,7 +17,7 @@ from PIL import Image, ImageTk
 
 from . import __version__
 from .app_logging import configure_logging
-from .auto_launch import ensure_auto_launcher, start_watcher_if_needed
+from .auto_launch import ensure_auto_launcher, is_dead_by_daylight_running, start_watcher_if_needed
 from .config import AppConfig, ConfigStore, Profile
 from .detector import DetectionResult, DetectionWorker
 from .focus import FocusGate, get_monitors
@@ -55,9 +55,10 @@ COLORS = {
 
 
 class OverlayApp:
-    def __init__(self, root_path: Path, start_minimized: bool = False) -> None:
+    def __init__(self, root_path: Path, start_minimized: bool = False, close_when_dbd_exits: bool = False) -> None:
         self.root_path = root_path
         self.start_minimized = start_minimized
+        self.close_when_dbd_exits = close_when_dbd_exits
         self.store = ConfigStore(root_path)
         self.config = self.store.load()
         self.config.map_library_visible = False
@@ -93,6 +94,8 @@ class OverlayApp:
         self.current_variant_index = 0
         self._log_after: str | None = None
         self._status_after: str | None = None
+        self._game_lifetime_after: str | None = None
+        self._game_absent_checks = 0
         self._monitor_names: list[str] = []
         self._map_buttons: dict[str, ctk.CTkButton] = {}
         self.sidebar: ctk.CTkFrame | None = None
@@ -123,6 +126,8 @@ class OverlayApp:
             self._update_overlay_status()
         if self.start_minimized:
             self.root.after(300, self._minimize_gui)
+        if self.close_when_dbd_exits:
+            self._watch_game_lifetime()
         self.logger.info("App ready. Loaded %s map(s).", len(self.library.entries))
 
     def run(self) -> None:
@@ -152,6 +157,21 @@ class OverlayApp:
             self.logger.info("Settings window opened minimized.")
         except Exception as exc:
             self.logger.warning("Could not minimize settings window: %s", exc)
+
+    def _watch_game_lifetime(self) -> None:
+        self._game_lifetime_after = None
+        try:
+            if is_dead_by_daylight_running():
+                self._game_absent_checks = 0
+            else:
+                self._game_absent_checks += 1
+                if self._game_absent_checks >= 3:
+                    self.logger.info("Dead by Daylight is no longer running. Closing overlay app.")
+                    self.close()
+                    return
+        except Exception as exc:
+            self.logger.warning("Could not check Dead by Daylight lifetime: %s", exc)
+        self._game_lifetime_after = self.root.after(5000, self._watch_game_lifetime)
 
     def _button_style(self, secondary: bool = False) -> dict:
         if secondary:
@@ -198,6 +218,8 @@ class OverlayApp:
             self.root.after_cancel(self._log_after)
         if self._status_after:
             self.root.after_cancel(self._status_after)
+        if self._game_lifetime_after:
+            self.root.after_cancel(self._game_lifetime_after)
         self.ocr_region_overlay.stop()
         self.overlay.stop()
         self.root.destroy()
