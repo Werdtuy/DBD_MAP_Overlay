@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.94
+
+- Added Hens cache migration so existing `Rancid Abbatoir` files are renamed to `Rancid Abattoir` when maps update.
+
 ## Beta 1.93
 
 - Treated OCR pipe characters as `I` before map matching to improve matches such as `SPRINGWOOD - BADHAM PRESCHOOL |`.

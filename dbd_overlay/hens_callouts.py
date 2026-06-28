@@ -15,6 +15,7 @@ IMAGE_BASE = "https://hens333.com/img/dbd/callouts/"
 USER_AGENT = "DBDCompanionOverlay/0.1 (+local map importer)"
 MAP_NAME_CORRECTIONS = {
     "rancid abbatioar": "Rancid Abattoir",
+    "rancid abbatoir": "Rancid Abattoir",
 }
 
 
@@ -69,6 +70,16 @@ def _correct_map_names(names: list[str]) -> list[str]:
     return corrected
 
 
+def _corrected_aliases(names: list[str], display_name: str) -> list[str]:
+    aliases: list[str] = []
+    for name in names:
+        if name == display_name:
+            continue
+        if MAP_NAME_CORRECTIONS.get(_name_key(name)) == display_name:
+            aliases.append(name)
+    return aliases
+
+
 def _parse_hens_maps(js: str) -> list[HensMap]:
     pattern = re.compile(r'\{realm:"(?P<realm>.*?)",names:\[(?P<names>.*?)\],image:"(?P<image>.*?)"\}')
     maps: list[HensMap] = []
@@ -117,6 +128,25 @@ def import_hens_callouts(
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / f"{_safe_filename(item.display_name)}{suffix}"
         metadata = target.with_name(f"{target.name}.json")
+        legacy_targets = [
+            target_dir / f"{_safe_filename(alias)}{suffix}"
+            for alias in _corrected_aliases(item.names, item.display_name)
+        ]
+        if not target.exists():
+            for legacy_target in legacy_targets:
+                legacy_metadata = legacy_target.with_name(f"{legacy_target.name}.json")
+                if legacy_target.exists():
+                    legacy_target.replace(target)
+                    if legacy_metadata.exists():
+                        legacy_metadata.replace(metadata)
+                    logger.info("Renamed cached Hens callout map: %s -> %s", legacy_target.stem, item.display_name)
+                    break
+        for legacy_target in legacy_targets:
+            legacy_metadata = legacy_target.with_name(f"{legacy_target.name}.json")
+            if legacy_target.exists() and legacy_target != target:
+                legacy_target.unlink()
+            if legacy_metadata.exists() and legacy_metadata != metadata:
+                legacy_metadata.unlink()
         cached = target.exists() and metadata.exists() and not force
 
         if cached:
