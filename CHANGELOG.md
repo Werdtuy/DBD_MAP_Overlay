@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.93
+
+- Treated OCR pipe characters as `I` before map matching to improve matches such as `SPRINGWOOD - BADHAM PRESCHOOL |`.
+- Corrected the Hens import name `Rancid Abbatioar` to `Rancid Abattoir` while keeping the misspelling as an alias.
+
 ## Beta 1.92
 
 - Moved Dead by Daylight session cleanup into the background watcher so it actively closes the overlay app when the game exits.

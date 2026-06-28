@@ -35,7 +35,8 @@ class DetectionResult:
 
 
 def _clean(value: str) -> str:
-    return "".join(ch.lower() for ch in value if ch.isalnum() or ch.isspace()).strip()
+    value = value.replace("|", "I")
+    return " ".join("".join(ch.lower() for ch in value if ch.isalnum() or ch.isspace()).split())
 
 
 class DetectionWorker:

@@ -13,6 +13,9 @@ from urllib.request import Request, urlopen
 CALLOUTS_URL = "https://hens333.com/callouts"
 IMAGE_BASE = "https://hens333.com/img/dbd/callouts/"
 USER_AGENT = "DBDCompanionOverlay/0.1 (+local map importer)"
+MAP_NAME_CORRECTIONS = {
+    "rancid abbatioar": "Rancid Abattoir",
+}
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,21 @@ def _safe_filename(value: str) -> str:
     return value or "map"
 
 
+def _name_key(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def _correct_map_names(names: list[str]) -> list[str]:
+    corrected: list[str] = []
+    for name in names:
+        fixed = MAP_NAME_CORRECTIONS.get(_name_key(name), name)
+        if fixed not in corrected:
+            corrected.append(fixed)
+        if name != fixed and name not in corrected:
+            corrected.append(name)
+    return corrected
+
+
 def _parse_hens_maps(js: str) -> list[HensMap]:
     pattern = re.compile(r'\{realm:"(?P<realm>.*?)",names:\[(?P<names>.*?)\],image:"(?P<image>.*?)"\}')
     maps: list[HensMap] = []
@@ -60,7 +78,7 @@ def _parse_hens_maps(js: str) -> list[HensMap]:
         if image in seen:
             continue
         seen.add(image)
-        names = json.loads(f'[{match.group("names")}]')
+        names = _correct_map_names(json.loads(f'[{match.group("names")}]'))
         maps.append(HensMap(realm=match.group("realm"), names=names, image=image))
     return maps
 
