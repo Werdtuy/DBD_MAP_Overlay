@@ -336,12 +336,16 @@ class PreviewStageLabel(QLabel):
             painter.fillRect(rect, QColor("#000000"))
             scaled = self.background.scaled(
                 rect.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            x = (rect.width() - scaled.width()) // 2
-            y = (rect.height() - scaled.height()) // 2
-            painter.drawPixmap(x, y, scaled)
+            source = QRectF(
+                max(0, (scaled.width() - rect.width()) / 2),
+                max(0, (scaled.height() - rect.height()) / 2),
+                rect.width(),
+                rect.height(),
+            )
+            painter.drawPixmap(QRectF(rect), scaled, source)
             shade = QLinearGradient(0, 0, 0, rect.height())
             shade.setColorAt(0.0, QColor(0, 0, 0, 115))
             shade.setColorAt(0.48, QColor(0, 0, 0, 18))
@@ -659,24 +663,37 @@ class QtOverlayWindow(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
+        self.overlay_panel = QFrame()
+        self.overlay_panel.setObjectName("overlayPanel")
+        self.overlay_panel.setStyleSheet(
+            "QFrame#overlayPanel { background: rgba(0, 0, 0, 205); "
+            "border: 1px solid rgba(74, 36, 40, 165); border-radius: 10px; }"
+        )
+        self.overlay_panel_layout = QVBoxLayout(self.overlay_panel)
+        self.overlay_panel_layout.setContentsMargins(8, 8, 8, 8)
+        self.overlay_panel_layout.setSpacing(0)
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setStyleSheet("background: transparent; border: 0;")
-        layout.addWidget(self.image_label)
+        self.overlay_panel_layout.addWidget(self.image_label)
         self.streak_frame = QFrame()
         self.streak_frame.setObjectName("darkCard")
+        self.streak_frame.setStyleSheet("QFrame#darkCard { background: transparent; border: 0; }")
         streak_layout = QVBoxLayout(self.streak_frame)
-        streak_layout.setContentsMargins(8, 4, 8, 5)
-        streak_layout.setSpacing(0)
+        streak_layout.setContentsMargins(10, 8, 10, 10)
+        streak_layout.setSpacing(2)
         self.streak_title = QLabel("")
         self.streak_title.setObjectName("hudTitle")
         self.streak_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.streak_title.setStyleSheet("font-size: 22px; font-weight: 900; color: #F6E7D8; letter-spacing: 1px;")
         self.streak_detail = QLabel("")
         self.streak_detail.setObjectName("muted")
         self.streak_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.streak_detail.setStyleSheet("font-size: 15px; font-weight: 700; color: #D8C8BC;")
         streak_layout.addWidget(self.streak_title)
         streak_layout.addWidget(self.streak_detail)
-        layout.addWidget(self.streak_frame)
+        self.overlay_panel_layout.addWidget(self.streak_frame)
+        layout.addWidget(self.overlay_panel)
         self.readout_label = QLabel("")
         self.readout_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.readout_label.setWordWrap(True)
@@ -740,33 +757,41 @@ class QtOverlayWindow(QWidget):
         self.streak_frame.setVisible(streak.enabled)
         if not streak.enabled:
             return
-        lobby = streak.lobby_code.strip().upper() or "LOCAL LOBBY"
         players = [f"P{idx + 1}:{player.status[:1].upper()}" for idx, player in enumerate(streak.players[:4])]
         self.streak_title.setText(f"ESCAPE STREAK  {max(0, int(streak.streak))}")
-        self.streak_detail.setText(f"{lobby}  |  {'  '.join(players)}")
+        self.streak_detail.setText("  ".join(players))
+
+    def _panel_padding(self) -> int:
+        margins = self.overlay_panel_layout.contentsMargins()
+        return int(margins.left() + margins.right())
+
+    def _window_width(self) -> int:
+        return int(self.config.overlay.size) + self._panel_padding()
 
     def _window_height(self) -> int:
-        streak_height = 54 if self.config.escape_streak.enabled else 0
+        margins = self.overlay_panel_layout.contentsMargins()
+        panel_padding = int(margins.top() + margins.bottom())
+        streak_height = 78 if self.config.escape_streak.enabled else 0
         readout_height = 44 if self.readout_label.text() else 0
-        return int(self.config.overlay.size) + streak_height + readout_height
+        return int(self.config.overlay.size) + streak_height + panel_padding + readout_height
 
     def _position(self) -> tuple[int, int]:
         overlay = self.config.overlay
         screen = selected_qscreen(overlay.monitor_index)
-        size = int(overlay.size)
+        width = self._window_width()
         height = self._window_height()
         if screen:
             geometry = screen.geometry()
             min_x = geometry.x() + overlay.margin_x
             min_y = geometry.y() + overlay.margin_y
-            max_x = max(min_x, geometry.x() + geometry.width() - size - overlay.margin_x)
+            max_x = max(min_x, geometry.x() + geometry.width() - width - overlay.margin_x)
             max_y = max(min_y, geometry.y() + geometry.height() - height - overlay.margin_y)
         else:
             monitors = get_monitors()
             monitor = monitors[min(max(overlay.monitor_index, 0), len(monitors) - 1)]
             min_x = monitor.x + overlay.margin_x
             min_y = monitor.y + overlay.margin_y
-            max_x = max(min_x, monitor.x + monitor.width - size - overlay.margin_x)
+            max_x = max(min_x, monitor.x + monitor.width - width - overlay.margin_x)
             max_y = max(min_y, monitor.y + monitor.height - height - overlay.margin_y)
         x_points = [min_x + round((max_x - min_x) * idx / 3) for idx in range(4)]
         y_points = [min_y + round((max_y - min_y) * idx / 3) for idx in range(4)]
@@ -778,7 +803,6 @@ class QtOverlayWindow(QWidget):
     def _apply_visibility(self) -> None:
         should_show = self.visible and self.config.overlay.enabled and self.asset is not None
         if should_show:
-            size = int(self.config.overlay.size)
             x, y = self._position()
             screen = selected_qscreen(self.config.overlay.monitor_index)
             if screen:
@@ -786,7 +810,7 @@ class QtOverlayWindow(QWidget):
                 handle = self.windowHandle()
                 if handle and handle.screen() != screen:
                     handle.setScreen(screen)
-            self.setGeometry(x, y, size, self._window_height())
+            self.setGeometry(x, y, self._window_width(), self._window_height())
             self.setWindowOpacity(self.config.overlay.opacity)
             self.show()
             self.raise_()
@@ -819,6 +843,7 @@ class QtOverlayWindow(QWidget):
             0,
         )
         self.image_label.setPixmap(pil_to_pixmap(rendered))
+        self.image_label.setFixedSize(int(overlay.size), int(overlay.size))
         if self.config.detection.performance_mode and not self._allow_performance_animation():
             return
         speed = max(0.1, overlay.animation_speed)
@@ -1719,10 +1744,9 @@ class OverlayQtApp(QMainWindow):
         self.preview_streak_frame.setVisible(streak.enabled)
         if not streak.enabled:
             return
-        lobby = streak.lobby_code.strip().upper() or "LOCAL LOBBY"
         players = [f"P{idx + 1}:{player.status[:1].upper()}" for idx, player in enumerate(streak.players[:4])]
         self.preview_streak_title.setText(f"ESCAPE STREAK  {max(0, int(streak.streak))}")
-        self.preview_streak_detail.setText(f"{lobby}  |  {'  '.join(players)}")
+        self.preview_streak_detail.setText("  ".join(players))
 
     def _set_streak_sync_enabled(self, checked: bool) -> None:
         self.config.escape_streak.sync_enabled = checked

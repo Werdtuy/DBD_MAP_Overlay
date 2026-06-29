@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 2.54
+
+- Added one shared translucent black backing panel behind the real overlay map and Escape Streak text so they read as a single block.
+- Enlarged the real overlay Escape Streak text and removed the lobby code from the visible strip.
+- Cropped the live-preview background asset and switched it to cover scaling to remove black side edges.
+
 ## Beta 2.53
 
 - Added a packaged live-preview background image and updated the preview panel to render it behind the map.
