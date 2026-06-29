@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 2.55
+
+- Removed the player-status detail row from the real overlay and live preview Escape Streak strip.
+- Reduced the real overlay backing panel padding so the black background hugs the map and streak title more closely.
+
 ## Beta 2.54
 
 - Added one shared translucent black backing panel behind the real overlay map and Escape Streak text so they read as a single block.

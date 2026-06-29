@@ -670,7 +670,7 @@ class QtOverlayWindow(QWidget):
             "border: 1px solid rgba(74, 36, 40, 165); border-radius: 10px; }"
         )
         self.overlay_panel_layout = QVBoxLayout(self.overlay_panel)
-        self.overlay_panel_layout.setContentsMargins(8, 8, 8, 8)
+        self.overlay_panel_layout.setContentsMargins(5, 5, 5, 5)
         self.overlay_panel_layout.setSpacing(0)
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -680,18 +680,13 @@ class QtOverlayWindow(QWidget):
         self.streak_frame.setObjectName("darkCard")
         self.streak_frame.setStyleSheet("QFrame#darkCard { background: transparent; border: 0; }")
         streak_layout = QVBoxLayout(self.streak_frame)
-        streak_layout.setContentsMargins(10, 8, 10, 10)
-        streak_layout.setSpacing(2)
+        streak_layout.setContentsMargins(8, 5, 8, 7)
+        streak_layout.setSpacing(0)
         self.streak_title = QLabel("")
         self.streak_title.setObjectName("hudTitle")
         self.streak_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.streak_title.setStyleSheet("font-size: 22px; font-weight: 900; color: #F6E7D8; letter-spacing: 1px;")
-        self.streak_detail = QLabel("")
-        self.streak_detail.setObjectName("muted")
-        self.streak_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.streak_detail.setStyleSheet("font-size: 15px; font-weight: 700; color: #D8C8BC;")
         streak_layout.addWidget(self.streak_title)
-        streak_layout.addWidget(self.streak_detail)
         self.overlay_panel_layout.addWidget(self.streak_frame)
         layout.addWidget(self.overlay_panel)
         self.readout_label = QLabel("")
@@ -757,9 +752,7 @@ class QtOverlayWindow(QWidget):
         self.streak_frame.setVisible(streak.enabled)
         if not streak.enabled:
             return
-        players = [f"P{idx + 1}:{player.status[:1].upper()}" for idx, player in enumerate(streak.players[:4])]
         self.streak_title.setText(f"ESCAPE STREAK  {max(0, int(streak.streak))}")
-        self.streak_detail.setText("  ".join(players))
 
     def _panel_padding(self) -> int:
         margins = self.overlay_panel_layout.contentsMargins()
@@ -771,7 +764,7 @@ class QtOverlayWindow(QWidget):
     def _window_height(self) -> int:
         margins = self.overlay_panel_layout.contentsMargins()
         panel_padding = int(margins.top() + margins.bottom())
-        streak_height = 78 if self.config.escape_streak.enabled else 0
+        streak_height = 42 if self.config.escape_streak.enabled else 0
         readout_height = 44 if self.readout_label.text() else 0
         return int(self.config.overlay.size) + streak_height + panel_padding + readout_height
 
@@ -1252,10 +1245,7 @@ class OverlayQtApp(QMainWindow):
         streak_layout.setContentsMargins(12, 8, 12, 8)
         self.preview_streak_title = label("", "hudTitle")
         self.preview_streak_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_streak_detail = label("", "muted")
-        self.preview_streak_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
         streak_layout.addWidget(self.preview_streak_title)
-        streak_layout.addWidget(self.preview_streak_detail)
         preview_layout.addWidget(self.preview_streak_frame)
         self.preview_toggle_hotkey_label = label(self._toggle_overlay_hotkey_text(), "muted")
         preview_layout.addWidget(self.preview_toggle_hotkey_label)
@@ -1744,9 +1734,7 @@ class OverlayQtApp(QMainWindow):
         self.preview_streak_frame.setVisible(streak.enabled)
         if not streak.enabled:
             return
-        players = [f"P{idx + 1}:{player.status[:1].upper()}" for idx, player in enumerate(streak.players[:4])]
         self.preview_streak_title.setText(f"ESCAPE STREAK  {max(0, int(streak.streak))}")
-        self.preview_streak_detail.setText("  ".join(players))
 
     def _set_streak_sync_enabled(self, checked: bool) -> None:
         self.config.escape_streak.sync_enabled = checked
