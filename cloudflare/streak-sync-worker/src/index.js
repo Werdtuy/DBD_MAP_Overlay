@@ -2,7 +2,7 @@ const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
-  "access-control-allow-headers": "content-type",
+  "access-control-allow-headers": "authorization,content-type,x-streak-admin-token",
 };
 
 const LOBBY_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -18,6 +18,9 @@ export default {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/health") {
         return json({ ok: true });
+      }
+      if (url.pathname.startsWith("/api/admin")) {
+        return await handleAdminRequest(request, env, url);
       }
       if (request.method === "POST" && url.pathname === "/api/lobbies") {
         return await createLobby(request, env);
@@ -43,6 +46,113 @@ export default {
     }
   },
 };
+
+async function handleAdminRequest(request, env, url) {
+  const auth = await requireAdmin(request, env);
+  if (auth) {
+    return auth;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/admin/stats") {
+    return await adminStats(env);
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/lobbies") {
+    return await adminListLobbies(env, url);
+  }
+  const match = url.pathname.match(/^\/api\/admin\/lobbies\/([A-Z0-9-]+)$/);
+  if (!match) {
+    return json({ error: "Admin route not found." }, 404);
+  }
+  const code = cleanCode(match[1]);
+  if (request.method === "GET") {
+    return await adminGetLobby(env, code);
+  }
+  if (request.method === "DELETE") {
+    return await adminDeleteLobby(env, code);
+  }
+  if (request.method === "PUT") {
+    return await adminUpdateLobby(request, env, code);
+  }
+  return json({ error: "Method not allowed." }, 405);
+}
+
+async function adminStats(env) {
+  let cursor = undefined;
+  let lobbyCount = 0;
+  let playerCount = 0;
+  let maxStreak = 0;
+  do {
+    const page = await env.STREAK_LOBBIES.list({ prefix: "lobby:", cursor });
+    for (const key of page.keys) {
+      const lobby = await env.STREAK_LOBBIES.get(key.name, "json");
+      if (!lobby) {
+        continue;
+      }
+      lobbyCount += 1;
+      playerCount += Object.keys(lobby.members || {}).length;
+      maxStreak = Math.max(maxStreak, Number(lobby.state?.streak || 0));
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return json({ lobby_count: lobbyCount, player_count: playerCount, max_streak: maxStreak });
+}
+
+async function adminListLobbies(env, url) {
+  const cursor = url.searchParams.get("cursor") || undefined;
+  const limit = Math.min(Math.max(Number.parseInt(url.searchParams.get("limit") || "50", 10), 1), 100);
+  const page = await env.STREAK_LOBBIES.list({ prefix: "lobby:", limit, cursor });
+  const lobbies = [];
+  for (const key of page.keys) {
+    const lobby = await env.STREAK_LOBBIES.get(key.name, "json");
+    if (lobby) {
+      lobbies.push(publicAdminLobby(lobby));
+    }
+  }
+  return json({
+    lobbies,
+    cursor: page.cursor || "",
+    list_complete: Boolean(page.list_complete),
+  });
+}
+
+async function adminGetLobby(env, code) {
+  const lobby = await loadLobby(env, code);
+  if (!lobby) {
+    return json({ error: "Lobby code was not found." }, 404);
+  }
+  return json(publicAdminLobby(lobby));
+}
+
+async function adminDeleteLobby(env, code) {
+  await env.STREAK_LOBBIES.delete(lobbyKey(code));
+  return json({ ok: true, code });
+}
+
+async function adminUpdateLobby(request, env, code) {
+  const lobby = await loadLobby(env, code);
+  if (!lobby) {
+    return json({ error: "Lobby code was not found." }, 404);
+  }
+  const body = await readJson(request);
+  if (body.action === "reset") {
+    lobby.state.streak = 0;
+    lobby.state.players = (lobby.state.players || []).map((player) => ({
+      name: cleanText(player?.name, 32),
+      status: "Ready",
+    }));
+  } else {
+    if (body.streak !== undefined) {
+      lobby.state.streak = clampInteger(body.streak, 0, 999);
+    }
+    if (Array.isArray(body.players)) {
+      lobby.state.players = sanitizeState({ players: body.players }).players;
+    }
+  }
+  lobby.state.sync_revision = Number(lobby.state?.sync_revision || 0) + 1;
+  lobby.updated_at = new Date().toISOString();
+  await saveLobby(env, lobby);
+  return json(publicAdminLobby(lobby));
+}
 
 async function createLobby(request, env) {
   const body = await readJson(request);
@@ -165,6 +275,47 @@ function publicLobby(lobby) {
     })),
     updated_at: lobby.updated_at,
   };
+}
+
+function publicAdminLobby(lobby) {
+  return {
+    code: lobby.code,
+    state: lobby.state,
+    members: Object.entries(lobby.members || {}).map(([playerId, member]) => ({
+      player_id: playerId,
+      name: member.name,
+      last_seen: member.last_seen,
+    })),
+    created_at: lobby.created_at,
+    updated_at: lobby.updated_at,
+  };
+}
+
+async function requireAdmin(request, env) {
+  if (!env.STREAK_ADMIN_TOKEN) {
+    return json({ error: "Admin token is not configured on this Worker." }, 503);
+  }
+  const auth = request.headers.get("authorization") || "";
+  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : "";
+  const token = bearer || request.headers.get("x-streak-admin-token") || "";
+  if (!(await timingSafeEqual(token, env.STREAK_ADMIN_TOKEN))) {
+    return json({ error: "Unauthorized." }, 401);
+  }
+  return null;
+}
+
+async function timingSafeEqual(left, right) {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(String(left || ""));
+  const rightBytes = encoder.encode(String(right || ""));
+  if (leftBytes.length !== rightBytes.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let index = 0; index < leftBytes.length; index += 1) {
+    diff |= leftBytes[index] ^ rightBytes[index];
+  }
+  return diff === 0;
 }
 
 function sanitizeState(input) {

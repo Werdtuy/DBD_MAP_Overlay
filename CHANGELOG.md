@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 2.2
+
+- Added secured admin endpoints to the Escape Streak Worker for listing, inspecting, resetting, updating, and deleting lobbies.
+- Added a private local Streak Manager tool for managing all active shared streak lobbies with a Worker URL and admin token.
+- Documented Cloudflare `STREAK_ADMIN_TOKEN` setup for the streak sync Worker.
+
 ## Beta 2.1
 
 - Added online Escape Streak lobbies so players can create or join a shared streak by code.
