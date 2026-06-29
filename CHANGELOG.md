@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 2.32
+
+- Removed the Cloudflare Worker README from the public repository.
+- Removed the private Streak Manager app and the Worker admin-management API.
+
 ## Beta 2.31
 
 - Made GitHub beta publishing fail clearly if the encrypted streak Worker URL cannot be packaged.

@@ -1,8 +1,8 @@
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
-  "access-control-allow-headers": "authorization,content-type,x-streak-admin-token",
+  "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
+  "access-control-allow-headers": "content-type",
 };
 
 const LOBBY_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -21,9 +21,6 @@ export default {
         return json({ ok: true });
       }
       await ensureSchema(env);
-      if (url.pathname.startsWith("/api/admin")) {
-        return await handleAdminRequest(request, env, url);
-      }
       if (request.method === "POST" && url.pathname === "/api/players/check") {
         return await checkPlayerTag(request, env);
       }
@@ -164,172 +161,6 @@ async function updatePlayerTag(request, env, tag) {
   profile.updated_at = new Date().toISOString();
   await savePlayer(env, profile);
   return json(publicPlayer(profile));
-}
-
-async function handleAdminRequest(request, env, url) {
-  const auth = await requireAdmin(request, env);
-  if (auth) {
-    return auth;
-  }
-
-  if (request.method === "GET" && url.pathname === "/api/admin/stats") {
-    return await adminStats(env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/admin/players") {
-    return await adminListPlayers(env, url);
-  }
-  if (request.method === "GET" && url.pathname === "/api/admin/lobbies") {
-    return await adminListLobbies(env, url);
-  }
-  const playerMatch = url.pathname.match(/^\/api\/admin\/players\/([^/]+)$/);
-  if (playerMatch) {
-    const tag = cleanTag(decodeURIComponent(playerMatch[1]));
-    if (request.method === "GET") {
-      return await adminGetPlayer(env, tag);
-    }
-    if (request.method === "DELETE") {
-      return await adminDeletePlayer(env, tag);
-    }
-    if (request.method === "PUT") {
-      return await adminUpdatePlayer(request, env, tag);
-    }
-    return json({ error: "Method not allowed." }, 405);
-  }
-  const lobbyMatch = url.pathname.match(/^\/api\/admin\/lobbies\/([A-Z0-9-]+)$/);
-  if (!lobbyMatch) {
-    return json({ error: "Admin route not found." }, 404);
-  }
-  const code = cleanCode(lobbyMatch[1]);
-  if (request.method === "GET") {
-    return await adminGetLobby(env, code);
-  }
-  if (request.method === "DELETE") {
-    return await adminDeleteLobby(env, code);
-  }
-  if (request.method === "PUT") {
-    return await adminUpdateLobby(request, env, code);
-  }
-  return json({ error: "Method not allowed." }, 405);
-}
-
-async function adminStats(env) {
-  const playerRow = await env.STREAK_DB.prepare(
-    `SELECT
-      COUNT(*) AS profile_count,
-      MAX(CAST(json_extract(state_json, '$.streak') AS INTEGER)) AS max_streak
-    FROM streak_profiles`,
-  ).first();
-  const lobbyRow = await env.STREAK_DB.prepare("SELECT COUNT(*) AS lobby_count FROM streak_lobbies WHERE expires_at > ?")
-    .bind(new Date().toISOString())
-    .first();
-  return json({
-    profile_count: Number(playerRow?.profile_count || 0),
-    lobby_count: Number(lobbyRow?.lobby_count || 0),
-    max_streak: Number(playerRow?.max_streak || 0),
-  });
-}
-
-async function adminListPlayers(env, url) {
-  const limit = Math.min(Math.max(Number.parseInt(url.searchParams.get("limit") || "100", 10), 1), 250);
-  const offset = Math.max(Number.parseInt(url.searchParams.get("offset") || "0", 10), 0);
-  const result = await env.STREAK_DB.prepare(
-    "SELECT tag, player_id, state_json, created_at, updated_at FROM streak_profiles ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-  )
-    .bind(limit, offset)
-    .all();
-  const players = (result.results || []).map(rowToAdminPlayer);
-  return json({ players, limit, offset, list_complete: players.length < limit });
-}
-
-async function adminGetPlayer(env, tag) {
-  const profile = await loadPlayer(env, tag);
-  if (!profile) {
-    return json({ error: "Player tag was not found." }, 404);
-  }
-  return json(publicAdminPlayer(profile));
-}
-
-async function adminDeletePlayer(env, tag) {
-  await env.STREAK_DB.prepare("DELETE FROM streak_profiles WHERE tag_normalized = ?")
-    .bind(normalizeTag(tag))
-    .run();
-  return json({ ok: true, tag });
-}
-
-async function adminUpdatePlayer(request, env, tag) {
-  const profile = await loadPlayer(env, tag);
-  if (!profile) {
-    return json({ error: "Player tag was not found." }, 404);
-  }
-  const body = await readJson(request);
-  if (body.action === "reset") {
-    profile.state.streak = 0;
-    profile.state.players = (profile.state.players || []).map((player) => ({
-      name: cleanText(player?.name, 32),
-      status: "Ready",
-    }));
-  } else {
-    if (body.streak !== undefined) {
-      profile.state.streak = clampInteger(body.streak, 0, 999);
-    }
-    if (Array.isArray(body.players)) {
-      profile.state.players = sanitizeState({ players: body.players }).players;
-    }
-  }
-  profile.state.sync_enabled = true;
-  profile.state.sync_player_tag = profile.tag;
-  profile.state.lobby_code = profile.tag;
-  profile.state.sync_revision = Number(profile.state?.sync_revision || 0) + 1;
-  profile.updated_at = new Date().toISOString();
-  await savePlayer(env, profile);
-  return json(publicAdminPlayer(profile));
-}
-
-async function adminListLobbies(env, url) {
-  const limit = Math.min(Math.max(Number.parseInt(url.searchParams.get("limit") || "100", 10), 1), 250);
-  const offset = Math.max(Number.parseInt(url.searchParams.get("offset") || "0", 10), 0);
-  const result = await env.STREAK_DB.prepare(
-    "SELECT code, state_json, members_json, created_at, updated_at, expires_at FROM streak_lobbies WHERE expires_at > ? ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-  )
-    .bind(new Date().toISOString(), limit, offset)
-    .all();
-  const lobbies = (result.results || []).map(rowToLobby).map(publicAdminLobby);
-  return json({ lobbies, limit, offset, list_complete: lobbies.length < limit });
-}
-
-async function adminGetLobby(env, code) {
-  const lobby = await loadLobby(env, code);
-  if (!lobby) {
-    return json({ error: "Lobby code was not found." }, 404);
-  }
-  return json(publicAdminLobby(lobby));
-}
-
-async function adminDeleteLobby(env, code) {
-  await env.STREAK_DB.prepare("DELETE FROM streak_lobbies WHERE code = ?").bind(code).run();
-  return json({ ok: true, code });
-}
-
-async function adminUpdateLobby(request, env, code) {
-  const lobby = await loadLobby(env, code);
-  if (!lobby) {
-    return json({ error: "Lobby code was not found." }, 404);
-  }
-  const body = await readJson(request);
-  if (body.action === "reset") {
-    lobby.state.streak = 0;
-    lobby.state.players = (lobby.state.players || []).map((player) => ({
-      name: cleanText(player?.name, 32),
-      status: "Ready",
-    }));
-  } else if (body.streak !== undefined) {
-    lobby.state.streak = clampInteger(body.streak, 0, 999);
-  }
-  lobby.state.sync_revision = Number(lobby.state?.sync_revision || 0) + 1;
-  lobby.updated_at = new Date().toISOString();
-  lobby.expires_at = lobbyExpiry();
-  await saveLobby(env, lobby);
-  return json(publicAdminLobby(lobby));
 }
 
 async function createLobby(request, env) {
@@ -520,23 +351,9 @@ function rowToPlayer(row) {
   };
 }
 
-function rowToAdminPlayer(row) {
-  return publicAdminPlayer(rowToPlayer(row));
-}
-
 function publicPlayer(profile) {
   return {
     tag: profile.tag,
-    state: profile.state,
-    created_at: profile.created_at,
-    updated_at: profile.updated_at,
-  };
-}
-
-function publicAdminPlayer(profile) {
-  return {
-    tag: profile.tag,
-    player_id: profile.player_id,
     state: profile.state,
     created_at: profile.created_at,
     updated_at: profile.updated_at,
@@ -594,47 +411,12 @@ function publicLobby(lobby) {
   };
 }
 
-function publicAdminLobby(lobby) {
-  return {
-    ...publicLobby(lobby),
-    members: lobby.members,
-    created_at: lobby.created_at,
-  };
-}
-
 function publicMember(member) {
   return {
     tag: member.tag,
     host: Boolean(member.host),
     last_seen: member.last_seen,
   };
-}
-
-async function requireAdmin(request, env) {
-  if (!env.STREAK_ADMIN_TOKEN) {
-    return json({ error: "Admin token is not configured on this Worker." }, 503);
-  }
-  const auth = request.headers.get("authorization") || "";
-  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : "";
-  const token = bearer || request.headers.get("x-streak-admin-token") || "";
-  if (!(await timingSafeEqual(token, env.STREAK_ADMIN_TOKEN))) {
-    return json({ error: "Unauthorized." }, 401);
-  }
-  return null;
-}
-
-async function timingSafeEqual(left, right) {
-  const encoder = new TextEncoder();
-  const leftBytes = encoder.encode(String(left || ""));
-  const rightBytes = encoder.encode(String(right || ""));
-  if (leftBytes.length !== rightBytes.length) {
-    return false;
-  }
-  let diff = 0;
-  for (let index = 0; index < leftBytes.length; index += 1) {
-    diff |= leftBytes[index] ^ rightBytes[index];
-  }
-  return diff === 0;
 }
 
 function parseState(raw) {
