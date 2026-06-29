@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 2.31
+
+- Made GitHub beta publishing fail clearly if the encrypted streak Worker URL cannot be packaged.
+
 ## Beta 2.3
 
 - Reworked Escape Streak sync around D1-backed lobby codes with player tags such as `Nikko#3213`.

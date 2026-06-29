@@ -149,6 +149,10 @@ def load_streak_config(root: Path) -> str:
             decrypt_server_url(encrypted_config)
             return encrypted_config
         except Exception:
+            if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+                raise RuntimeError(
+                    "Encrypted streak sync server configuration is missing. Add the STREAK_SYNC_URL GitHub secret."
+                )
             return ""
     server_url = server_url.rstrip("/")
     if not server_url.startswith("https://"):
