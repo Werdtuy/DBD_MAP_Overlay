@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 2.52
+
+- Removed the redundant large `Maps` rail button and kept map-library access on the existing `Open Map Library` button in Map Selection.
+- Replaced the green-tinted live preview stage with a darker charcoal/red ash background.
+- Renamed the `Players` navigation tab to `Escape Streak` and allowed nav labels to wrap cleanly.
+
 ## Beta 2.51
 
 - Locked overlay edge placement to the selected Qt monitor so positions such as `1,4` do not jump screens on multi-monitor setups.

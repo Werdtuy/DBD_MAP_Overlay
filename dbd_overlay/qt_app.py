@@ -329,32 +329,36 @@ class PreviewStageLabel(QLabel):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect()
         gradient = QLinearGradient(0, 0, rect.width(), rect.height())
-        gradient.setColorAt(0.0, QColor("#020303"))
-        gradient.setColorAt(0.42, QColor("#07100E"))
-        gradient.setColorAt(0.74, QColor("#09110F"))
-        gradient.setColorAt(1.0, QColor("#160708"))
+        gradient.setColorAt(0.0, QColor("#020202"))
+        gradient.setColorAt(0.42, QColor("#080607"))
+        gradient.setColorAt(0.72, QColor("#120709"))
+        gradient.setColorAt(1.0, QColor("#020202"))
         painter.fillRect(rect, gradient)
 
-        mist = QLinearGradient(0, rect.height() * 0.25, 0, rect.height())
-        mist.setColorAt(0.0, QColor(23, 33, 30, 55))
-        mist.setColorAt(0.58, QColor(16, 22, 19, 105))
-        mist.setColorAt(1.0, QColor(0, 0, 0, 210))
+        mist = QLinearGradient(0, 0, 0, rect.height())
+        mist.setColorAt(0.0, QColor(0, 0, 0, 195))
+        mist.setColorAt(0.42, QColor(70, 18, 24, 52))
+        mist.setColorAt(0.68, QColor(18, 14, 15, 112))
+        mist.setColorAt(1.0, QColor(0, 0, 0, 230))
         painter.fillRect(rect, mist)
 
-        painter.setPen(QPen(QColor(18, 22, 20, 175), 4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        for idx in range(11):
-            x = int((idx / 10) * rect.width())
-            lean = -18 + (idx % 4) * 12
+        painter.setPen(QPen(QColor(34, 28, 29, 165), 4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        for idx in range(12):
+            x = int((idx / 11) * rect.width())
+            lean = -16 + (idx % 5) * 8
             painter.drawLine(x, 0, x + lean, rect.height())
-            painter.setPen(QPen(QColor(43, 48, 42, 90), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            painter.drawLine(x + lean // 2, int(rect.height() * 0.18), x + lean - 45, int(rect.height() * 0.36))
-            painter.drawLine(x + lean // 3, int(rect.height() * 0.24), x + lean + 54, int(rect.height() * 0.42))
-            painter.setPen(QPen(QColor(18, 22, 20, 175), 4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
 
-        glow = QLinearGradient(rect.width() * 0.72, rect.height() * 0.1, rect.width() * 0.95, rect.height() * 0.35)
-        glow.setColorAt(0.0, QColor(235, 217, 160, 78))
-        glow.setColorAt(1.0, QColor(235, 217, 160, 0))
-        painter.fillRect(QRectF(rect.width() * 0.58, 0, rect.width() * 0.42, rect.height() * 0.5), glow)
+        glow = QLinearGradient(rect.width() * 0.2, rect.height() * 0.2, rect.width() * 0.9, rect.height() * 0.78)
+        glow.setColorAt(0.0, QColor(130, 25, 32, 84))
+        glow.setColorAt(0.48, QColor(44, 12, 15, 42))
+        glow.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.fillRect(rect, glow)
+
+        painter.setPen(QPen(QColor(158, 27, 36, 54), 1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        for idx in range(18):
+            x = 18 + (idx * 47) % max(1, rect.width() - 36)
+            y = 24 + (idx * 31) % max(1, rect.height() - 48)
+            painter.drawLine(x, y, min(rect.right() - 18, x + 28), max(rect.top() + 18, y - 9))
 
         painter.setPen(QPen(QColor(COLORS["border"]), 1))
         painter.drawRoundedRect(rect.adjusted(1, 1, -2, -2), 8, 8)
@@ -463,7 +467,11 @@ class NavButton(QPushButton):
         self._draw_icon(painter, QRectF(37, 15, 50, 46), color)
         painter.setPen(QColor(COLORS["accent"] if selected else COLORS["muted"]))
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        painter.drawText(QRectF(6, 69, self.width() - 12, 24), Qt.AlignmentFlag.AlignCenter, self.nav_text.upper())
+        painter.drawText(
+            QRectF(6, 66, self.width() - 12, 34),
+            Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
+            self.nav_text.upper(),
+        )
 
     def _draw_icon(self, painter: QPainter, rect: QRectF, color: QColor) -> None:
         if not self.icon_pixmap.isNull():
@@ -1047,10 +1055,6 @@ class OverlayQtApp(QMainWindow):
         nav_layout.setContentsMargins(0, 10, 0, 10)
         nav_layout.setSpacing(0)
         icon_dir = self._resource_path("assets", "nav_icons")
-        self.map_library_nav_button = NavButton("overlay", "Maps", icon_dir)
-        self.map_library_nav_button.clicked.connect(self._toggle_map_library)
-        nav_layout.addWidget(self.map_library_nav_button)
-        nav_layout.addSpacing(6)
         body.addWidget(nav)
 
         self.sidebar = QFrame()
@@ -1089,7 +1093,7 @@ class OverlayQtApp(QMainWindow):
 
         pages = [
             ("general", "General", self._build_overlay_tab()),
-            ("players", "Players", self._build_escape_streak_tab()),
+            ("players", "Escape Streak", self._build_escape_streak_tab()),
             ("overlay", "OCR", self._build_detection_tab()),
             ("hotkeys", "Hotkeys", self._build_hotkeys_tab()),
             ("appearance", "Settings", self._build_settings_tab()),
@@ -1479,8 +1483,6 @@ class OverlayQtApp(QMainWindow):
         self.sidebar.setVisible(visible)
         if hasattr(self, "sidebar_show_button"):
             self.sidebar_show_button.setVisible(not visible)
-        if hasattr(self, "map_library_nav_button"):
-            self.map_library_nav_button.setChecked(visible)
         self.map_toggle_button.setText("Hide" if visible else "Show")
 
     def _toggle_map_settings(self) -> None:
