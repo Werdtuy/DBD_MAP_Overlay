@@ -76,6 +76,22 @@ class UpdateSettings:
 
 
 @dataclass
+class EscapeStreakPlayer:
+    name: str = ""
+    status: str = "Ready"
+
+
+@dataclass
+class EscapeStreakSettings:
+    enabled: bool = False
+    lobby_code: str = ""
+    streak: int = 0
+    players: list[EscapeStreakPlayer] = field(
+        default_factory=lambda: [EscapeStreakPlayer() for _ in range(4)]
+    )
+
+
+@dataclass
 class Profile:
     name: str = "Default"
     overlay: OverlaySettings = field(default_factory=OverlaySettings)
@@ -92,6 +108,7 @@ class AppConfig:
     hotkeys: HotkeySettings = field(default_factory=HotkeySettings)
     game: GameSettings = field(default_factory=GameSettings)
     updates: UpdateSettings = field(default_factory=UpdateSettings)
+    escape_streak: EscapeStreakSettings = field(default_factory=EscapeStreakSettings)
     last_selected_map: str = ""
 
     @property
@@ -122,6 +139,13 @@ def _coerce_dataclass(cls: type, data: dict[str, Any]):
                 for item in value
                 if isinstance(item, dict)
             ]
+        elif f.name == "players" and isinstance(value, list):
+            players = [
+                _coerce_dataclass(EscapeStreakPlayer, item)
+                for item in value
+                if isinstance(item, dict)
+            ]
+            kwargs[f.name] = (players + [EscapeStreakPlayer() for _ in range(4)])[:4]
         else:
             kwargs[f.name] = value
     return cls(**kwargs)

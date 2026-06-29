@@ -8,12 +8,11 @@ import json
 from pathlib import Path
 import platform
 import sys
+import tkinter as tk
 from tkinter import messagebox
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import winreg
-
-import customtkinter as ctk
 
 from .secure_config import decrypt_server_url
 
@@ -172,62 +171,82 @@ class LicenseDialog:
         self.store = store
         self.app_version = app_version
         self.valid = False
-        self.root = ctk.CTk()
+        self.root = tk.Tk()
         self.root.title("DBD Companion Overlay Activation")
         self.root.geometry("560x350")
         self.root.minsize(520, 330)
         self.root.resizable(False, False)
+        self.root.configure(bg="#111318")
         self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
 
-        panel = ctk.CTkFrame(self.root, corner_radius=0, fg_color="#111318")
+        panel = tk.Frame(self.root, bg="#111318")
         panel.pack(fill="both", expand=True)
-        ctk.CTkLabel(
+        tk.Label(
             panel,
             text="DBD Companion Overlay",
             font=("Segoe UI Semibold", 24),
-            text_color="#f7f2ea",
+            fg="#f7f2ea",
+            bg="#111318",
         ).pack(anchor="w", padx=28, pady=(28, 2))
-        ctk.CTkLabel(
+        tk.Label(
             panel,
             text="License activation",
             font=("Segoe UI", 14),
-            text_color="#c72435",
+            fg="#c72435",
+            bg="#111318",
         ).pack(anchor="w", padx=28)
-        ctk.CTkLabel(
+        tk.Label(
             panel,
             text="Enter a valid license key to start the overlay.",
             font=("Segoe UI", 13),
-            text_color="#c7c0b7",
+            fg="#c7c0b7",
+            bg="#111318",
         ).pack(anchor="w", padx=28, pady=(24, 8))
-        self.entry = ctk.CTkEntry(panel, height=38, placeholder_text="License key")
-        self.entry.pack(fill="x", padx=28)
+        self.entry = tk.Entry(
+            panel,
+            font=("Segoe UI", 13),
+            bg="#2a2f38",
+            fg="#f7f2ea",
+            insertbackground="#f7f2ea",
+            relief="flat",
+        )
+        self.entry.pack(fill="x", padx=28, ipady=9)
         self.entry.insert(0, initial_key)
-        self.status = ctk.CTkLabel(
+        self.status = tk.Label(
             panel,
             text=initial_message,
             font=("Segoe UI", 12),
-            text_color="#d46a73",
+            fg="#d46a73",
+            bg="#111318",
             wraplength=490,
             justify="left",
         )
         self.status.pack(anchor="w", padx=28, pady=(10, 0))
-        controls = ctk.CTkFrame(panel, fg_color="transparent")
+        controls = tk.Frame(panel, bg="#111318")
         controls.pack(fill="x", padx=28, pady=(24, 22), side="bottom")
-        ctk.CTkButton(
+        tk.Button(
             controls,
             text="Activate",
             command=self._activate,
-            height=36,
-            fg_color="#b51f2c",
-            hover_color="#d12a39",
+            bg="#b51f2c",
+            fg="#f7f2ea",
+            activebackground="#d12a39",
+            activeforeground="#ffffff",
+            relief="flat",
+            padx=28,
+            pady=8,
         ).pack(side="left")
-        ctk.CTkButton(
+        tk.Button(
             controls,
             text="Close",
             command=self.root.destroy,
-            height=36,
-            fg_color="#2a2f38",
-            hover_color="#3a424f",
+            bg="#2a2f38",
+            fg="#f7f2ea",
+            activebackground="#3a424f",
+            activeforeground="#ffffff",
+            relief="flat",
+            padx=28,
+            pady=8,
         ).pack(side="right")
         self.root.bind("<Return>", lambda _event: self._activate())
 
@@ -256,7 +275,6 @@ class LicenseDialog:
 
 
 def require_valid_license(root: Path, app_version: str) -> bool:
-    ctk.set_appearance_mode("dark")
     store = LicenseStore(root)
     stored_key = store.load_key()
     initial_message = ""

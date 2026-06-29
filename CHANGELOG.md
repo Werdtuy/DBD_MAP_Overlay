@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta 2.0
+
+- Replaced the companion settings window with a PySide6/Qt interface for a more customizable DBD-style layout.
+- Added a toggleable Escape Streak module with lobby code, streak controls, and four team player slots.
+- Added an optional Escape Streak HUD strip under the overlay map and inside the live preview.
+- Restyled the app with darker panels, red accents, warmer text, larger placement controls, and icon-style tab labels.
+- Removed the CustomTkinter runtime dependency from the launch path and build requirements.
+
 ## Beta 1.94
 
 - Added Hens cache migration so existing `Rancid Abbatoir` files are renamed to `Rancid Abattoir` when maps update.

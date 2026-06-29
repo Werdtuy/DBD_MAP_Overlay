@@ -226,7 +226,7 @@ def main() -> int:
         "--specpath",
         str(build_dir),
         "--collect-all",
-        "customtkinter",
+        "PySide6",
         "--collect-all",
         "charset_normalizer",
         "--collect-all",
