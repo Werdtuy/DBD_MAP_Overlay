@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dbd-streak-sync",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-29",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "kv_namespaces": [
+    {
+      "binding": "STREAK_LOBBIES",
+      "id": "replace-with-your-kv-namespace-id"
+    }
+  ]
+}

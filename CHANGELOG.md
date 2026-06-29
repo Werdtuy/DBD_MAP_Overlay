@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 2.1
+
+- Added online Escape Streak lobbies so players can create or join a shared streak by code.
+- Added saved streak sync settings for server URL, display name, lobby code, and per-device player identity.
+- Added a Cloudflare Worker + KV backend template for shared lobby state without committing private account secrets.
+- Reworked the companion navigation toward the concept art with a custom icon rail and darker staged panels.
+
 ## Beta 2.0
 
 - Replaced the companion settings window with a PySide6/Qt interface for a more customizable DBD-style layout.

@@ -86,6 +86,12 @@ class EscapeStreakSettings:
     enabled: bool = False
     lobby_code: str = ""
     streak: int = 0
+    sync_enabled: bool = False
+    sync_server_url: str = ""
+    sync_lobby_code: str = ""
+    sync_player_id: str = ""
+    sync_player_name: str = ""
+    sync_revision: int = 0
     players: list[EscapeStreakPlayer] = field(
         default_factory=lambda: [EscapeStreakPlayer() for _ in range(4)]
     )

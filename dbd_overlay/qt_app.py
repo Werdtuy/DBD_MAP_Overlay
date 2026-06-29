@@ -9,10 +9,11 @@ from queue import Queue
 import shutil
 import sys
 import threading
+import uuid
 
 from PIL import Image
 from PySide6.QtCore import QObject, QPointF, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QIcon, QImage, QLinearGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -33,7 +34,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSpinBox,
-    QTabWidget,
+    QStackedWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -52,6 +53,7 @@ from .maps import MapAsset, MapLibrary
 from .ocr_region import active_ocr_region, compute_auto_ocr_region
 from .plugins import PluginManager
 from .rendering import AnimatedImage, render_frame
+from .streak_sync import StreakSyncClient, StreakSyncError
 from .tesseract import is_tesseract_path, tesseract_search_report
 from .update_status import AppUpdateStatus, check_for_app_update, stage_app_update
 from .updates import MapUpdateChecker
@@ -85,16 +87,26 @@ QMainWindow, QWidget#root {{
     background: {COLORS["bg"]};
 }}
 QFrame#topBar, QFrame#sidebar {{
-    background: {COLORS["sidebar"]};
+    background: rgba(7, 7, 8, 226);
     border: 0;
 }}
+QFrame#navRail {{
+    background: rgba(4, 5, 6, 232);
+    border: 1px solid rgba(86, 24, 31, 150);
+    border-radius: 8px;
+}}
+QFrame#contentSurface {{
+    background: rgba(8, 8, 9, 224);
+    border: 1px solid {COLORS["border"]};
+    border-radius: 8px;
+}}
 QFrame#card, QScrollArea#card {{
-    background: {COLORS["panel"]};
+    background: rgba(17, 14, 15, 220);
     border: 1px solid {COLORS["border"]};
     border-radius: 8px;
 }}
 QFrame#darkCard {{
-    background: {COLORS["panel_dark"]};
+    background: rgba(5, 5, 6, 232);
     border: 1px solid {COLORS["border"]};
     border-radius: 8px;
 }}
@@ -162,27 +174,6 @@ QCheckBox::indicator {{
 }}
 QCheckBox::indicator:checked {{
     background: {COLORS["accent"]};
-}}
-QTabWidget::pane {{
-    border: 1px solid {COLORS["border"]};
-    border-radius: 8px;
-    background: {COLORS["surface"]};
-    top: -1px;
-}}
-QTabBar::tab {{
-    background: {COLORS["panel_dark"]};
-    border: 1px solid {COLORS["border"]};
-    border-bottom: 0;
-    padding: 8px 14px;
-    margin-right: 4px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    color: {COLORS["muted"]};
-    font-weight: 700;
-}}
-QTabBar::tab:selected {{
-    background: {COLORS["accent_dark"]};
-    color: {COLORS["text"]};
 }}
 QSlider::groove:horizontal {{
     height: 5px;
@@ -271,6 +262,112 @@ def card(object_name: str = "card") -> QFrame:
     frame = QFrame()
     frame.setObjectName(object_name)
     return frame
+
+
+class HorrorRoot(QWidget):
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        gradient = QLinearGradient(0, 0, self.width(), self.height())
+        gradient.setColorAt(0.0, QColor("#040405"))
+        gradient.setColorAt(0.55, QColor("#070808"))
+        gradient.setColorAt(1.0, QColor("#13080A"))
+        painter.fillRect(self.rect(), gradient)
+
+        painter.setPen(QPen(QColor(74, 18, 24, 70), 1))
+        for idx in range(18):
+            x = int(self.width() * (idx / 17))
+            painter.drawLine(x, 0, max(0, x - 120), self.height())
+        painter.setPen(QPen(QColor(125, 28, 37, 35), 2))
+        for idx in range(6):
+            y = 64 + idx * 113
+            painter.drawLine(0, y, self.width(), y - 80)
+
+
+class ClawLogo(QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(46, 46)
+
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor(COLORS["accent"]), 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        for idx, x in enumerate((14, 23, 32)):
+            painter.drawLine(x, 8 + idx * 2, x - 4, 35)
+            painter.drawLine(x - 1, 8 + idx * 2, x + 4, 33)
+
+
+class NavButton(QPushButton):
+    def __init__(self, icon_name: str, text: str, parent=None) -> None:
+        super().__init__(parent)
+        self.icon_name = icon_name
+        self.nav_text = text
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(124, 96)
+        self.setStyleSheet("background: transparent; border: 0;")
+
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        selected = self.isChecked()
+        if selected:
+            painter.fillRect(rect, QColor(45, 9, 13, 190))
+            painter.setPen(QPen(QColor(COLORS["accent"]), 2))
+            painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom())
+            painter.drawRoundedRect(QRectF(rect), 4, 4)
+        elif self.underMouse():
+            painter.fillRect(rect, QColor(30, 18, 20, 150))
+        color = QColor(COLORS["accent"] if selected else "#8D8D8D")
+        self._draw_icon(painter, QRectF(36, 15, 52, 42), color)
+        painter.setPen(QColor(COLORS["accent"] if selected else COLORS["muted"]))
+        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        painter.drawText(QRectF(6, 61, self.width() - 12, 24), Qt.AlignmentFlag.AlignCenter, self.nav_text.upper())
+
+    def _draw_icon(self, painter: QPainter, rect: QRectF, color: QColor) -> None:
+        painter.setPen(QPen(color, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        cx = rect.center().x()
+        cy = rect.center().y()
+        if self.icon_name == "claw":
+            for idx, x in enumerate((rect.left() + 14, rect.center().x(), rect.right() - 14)):
+                painter.drawLine(QPointF(x, rect.top() + 2 + idx), QPointF(x - 5, rect.bottom() - 4))
+                painter.drawLine(QPointF(x, rect.top() + 2 + idx), QPointF(x + 5, rect.bottom() - 6))
+        elif self.icon_name == "streak":
+            painter.drawEllipse(QPointF(cx, cy), 15, 15)
+            painter.drawLine(QPointF(cx, rect.top() + 4), QPointF(cx, cy + 3))
+            painter.drawLine(QPointF(cx, cy + 3), QPointF(cx + 10, cy - 8))
+        elif self.icon_name == "ocr":
+            painter.drawEllipse(QRectF(rect.left() + 8, rect.top() + 5, 24, 24))
+            painter.drawLine(QPointF(rect.left() + 28, rect.top() + 29), QPointF(rect.right() - 7, rect.bottom() - 6))
+        elif self.icon_name == "keys":
+            key_rect = rect.adjusted(5, 10, -5, -10)
+            painter.drawRoundedRect(key_rect, 4, 4)
+            for row in range(2):
+                for col in range(4):
+                    painter.drawRect(QRectF(key_rect.left() + 7 + col * 9, key_rect.top() + 7 + row * 9, 5, 5))
+        elif self.icon_name == "settings":
+            painter.drawEllipse(QPointF(cx, cy), 9, 9)
+            for angle in range(0, 360, 60):
+                import math
+
+                rad = math.radians(angle)
+                inner = QPointF(cx + math.cos(rad) * 15, cy + math.sin(rad) * 15)
+                outer = QPointF(cx + math.cos(rad) * 23, cy + math.sin(rad) * 23)
+                painter.drawLine(inner, outer)
+        elif self.icon_name == "logs":
+            for idx in range(4):
+                y = rect.top() + 9 + idx * 8
+                painter.drawLine(QPointF(rect.left() + 8, y), QPointF(rect.right() - 8, y))
+                painter.drawEllipse(QPointF(rect.left() + 3, y), 1.5, 1.5)
+        elif self.icon_name == "maps":
+            painter.drawRect(QRectF(rect.left() + 8, rect.top() + 7, 30, 28))
+            painter.drawLine(QPointF(rect.left() + 18, rect.top() + 7), QPointF(rect.left() + 18, rect.top() + 35))
+            painter.drawLine(QPointF(rect.left() + 28, rect.top() + 7), QPointF(rect.left() + 28, rect.top() + 35))
+        else:
+            painter.drawRoundedRect(rect.adjusted(8, 8, -8, -8), 5, 5)
 
 
 class UiBus(QObject):
@@ -626,6 +723,8 @@ class OverlayQtApp(QMainWindow):
         self.config = self.store.load()
         self.config.map_library_visible = False
         self.config.overlay.border_width = 0
+        if not self.config.escape_streak.sync_player_id:
+            self.config.escape_streak.sync_player_id = uuid.uuid4().hex
         self.logger, self.log_queue = configure_logging(root_path)
         self.logger.info("Settings imported automatically from %s", self.store.path)
         ensure_auto_launcher(root_path, self.logger)
@@ -660,6 +759,10 @@ class OverlayQtApp(QMainWindow):
         self._status_timer.timeout.connect(self._update_overlay_status_once)
         self._game_timer = QTimer(self)
         self._game_timer.timeout.connect(self._watch_game_lifetime)
+        self._streak_sync_timer = QTimer(self)
+        self._streak_sync_timer.timeout.connect(self._poll_streak_lobby)
+        self._streak_sync_busy = False
+        self._streak_applying_remote = False
 
         self.setWindowTitle("DBD Companion Overlay")
         self.resize(1180, 780)
@@ -680,6 +783,7 @@ class OverlayQtApp(QMainWindow):
         self._pump_logs_once()
         self._update_overlay_status_once()
         self._apply_performance_timer_state()
+        self._apply_streak_sync_timer_state()
         if self.start_minimized:
             QTimer.singleShot(300, self.showMinimized)
         if self.close_when_dbd_exits:
@@ -697,6 +801,7 @@ class OverlayQtApp(QMainWindow):
         self._log_timer.stop()
         self._status_timer.stop()
         self._game_timer.stop()
+        self._streak_sync_timer.stop()
         self.ocr_region_overlay.stop()
         self.overlay.stop()
         event.accept()
@@ -711,8 +816,17 @@ class OverlayQtApp(QMainWindow):
             return Path(getattr(sys, "_MEIPASS", self.root_path)).joinpath(*parts)
         return self.root_path.joinpath(*parts)
 
+        self.tabs.addTab(self._build_overlay_tab(), "▣ Map")
+        self.tabs.addTab(self._build_escape_streak_tab(), "◆ Streak")
+        self.tabs.addTab(self._build_detection_tab(), "⌕ OCR")
+        self.tabs.addTab(self._build_hotkeys_tab(), "⌨ Keys")
+        self.tabs.addTab(self._build_settings_tab(), "⚙ Settings")
+        self.tabs.addTab(self._build_logs_tab(), "≡ Logs")
+        self._refresh_map_list()
+        self._apply_map_library_visibility()
+
     def _build_ui(self) -> None:
-        root = QWidget()
+        root = HorrorRoot()
         root.setObjectName("root")
         self.setCentralWidget(root)
         shell = QVBoxLayout(root)
@@ -722,10 +836,15 @@ class OverlayQtApp(QMainWindow):
         top = QFrame()
         top.setObjectName("topBar")
         top_layout = QHBoxLayout(top)
-        top_layout.setContentsMargins(20, 10, 20, 10)
-        title = label(f"DBD Companion Overlay  |  {__version__}", "title")
-        title.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
-        top_layout.addWidget(title)
+        top_layout.setContentsMargins(18, 8, 18, 8)
+        top_layout.addWidget(ClawLogo())
+        title_box = QVBoxLayout()
+        title_box.setSpacing(0)
+        title = label("DBD Companion Overlay", "title")
+        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title_box.addWidget(title)
+        title_box.addWidget(label(__version__, "muted"))
+        top_layout.addLayout(title_box)
         top_layout.addStretch(1)
         self.app_update_status_label = label("", "muted")
         top_layout.addWidget(self.app_update_status_label)
@@ -734,9 +853,21 @@ class OverlayQtApp(QMainWindow):
         shell.addWidget(top)
 
         body = QHBoxLayout()
-        body.setContentsMargins(16, 16, 16, 16)
-        body.setSpacing(16)
+        body.setContentsMargins(12, 0, 12, 14)
+        body.setSpacing(12)
         shell.addLayout(body, 1)
+
+        nav = QFrame()
+        nav.setObjectName("navRail")
+        nav.setFixedWidth(138)
+        nav_layout = QVBoxLayout(nav)
+        nav_layout.setContentsMargins(0, 10, 0, 10)
+        nav_layout.setSpacing(0)
+        self.map_library_nav_button = NavButton("maps", "Maps")
+        self.map_library_nav_button.clicked.connect(self._toggle_map_library)
+        nav_layout.addWidget(self.map_library_nav_button)
+        nav_layout.addSpacing(6)
+        body.addWidget(nav)
 
         self.sidebar = QFrame()
         self.sidebar.setObjectName("sidebar")
@@ -764,20 +895,38 @@ class OverlayQtApp(QMainWindow):
         sidebar_layout.addLayout(row)
         body.addWidget(self.sidebar)
 
-        self.sidebar_show_button = make_button("Maps", self._toggle_map_library, secondary=True)
-        self.sidebar_show_button.setFixedWidth(76)
-        body.addWidget(self.sidebar_show_button, 0, Qt.AlignmentFlag.AlignTop)
+        content = QFrame()
+        content.setObjectName("contentSurface")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        self.stack = QStackedWidget()
+        content_layout.addWidget(self.stack)
+        body.addWidget(content, 1)
 
-        self.tabs = QTabWidget()
-        body.addWidget(self.tabs, 1)
-        self.tabs.addTab(self._build_overlay_tab(), "▣ Map")
-        self.tabs.addTab(self._build_escape_streak_tab(), "◆ Streak")
-        self.tabs.addTab(self._build_detection_tab(), "⌕ OCR")
-        self.tabs.addTab(self._build_hotkeys_tab(), "⌨ Keys")
-        self.tabs.addTab(self._build_settings_tab(), "⚙ Settings")
-        self.tabs.addTab(self._build_logs_tab(), "≡ Logs")
+        pages = [
+            ("claw", "General", self._build_overlay_tab()),
+            ("streak", "Players", self._build_escape_streak_tab()),
+            ("ocr", "OCR", self._build_detection_tab()),
+            ("keys", "Hotkeys", self._build_hotkeys_tab()),
+            ("settings", "Settings", self._build_settings_tab()),
+            ("logs", "Logs", self._build_logs_tab()),
+        ]
+        self.nav_buttons: list[NavButton] = []
+        for index, (icon_name, page_name, page) in enumerate(pages):
+            button = NavButton(icon_name, page_name)
+            button.clicked.connect(lambda _checked=False, idx=index: self._set_nav_page(idx))
+            nav_layout.addWidget(button)
+            self.nav_buttons.append(button)
+            self.stack.addWidget(page)
+        nav_layout.addStretch(1)
+        self._set_nav_page(0)
         self._refresh_map_list()
         self._apply_map_library_visibility()
+
+    def _set_nav_page(self, index: int) -> None:
+        self.stack.setCurrentIndex(index)
+        for idx, button in enumerate(self.nav_buttons):
+            button.setChecked(idx == index)
 
     def _build_overlay_tab(self) -> QWidget:
         page = QWidget()
@@ -854,6 +1003,103 @@ class OverlayQtApp(QMainWindow):
         layout.addWidget(controls_scroll, 2)
         return page
 
+    def _build_overlay_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(0)
+
+        controls = card()
+        controls.setFixedWidth(430)
+        controls_layout = QVBoxLayout(controls)
+        controls_layout.setContentsMargins(26, 24, 22, 18)
+        controls_layout.setSpacing(14)
+
+        controls_layout.addWidget(label("Overlay Enabled", "sectionTitle"))
+        self.enabled_check = QCheckBox("Enable in-game overlay")
+        self.enabled_check.setChecked(self.config.overlay.enabled)
+        self.enabled_check.toggled.connect(self._toggle_enabled)
+        controls_layout.addWidget(self.enabled_check)
+        controls_layout.addWidget(make_button("Show Test Overlay", self._show_test_overlay))
+        self.overlay_status_label = label("Overlay status: starting", "muted")
+        controls_layout.addWidget(self.overlay_status_label)
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setStyleSheet(f"color: {COLORS['border']};")
+        controls_layout.addWidget(separator)
+
+        controls_layout.addWidget(label("Map Selection", "sectionTitle"))
+        map_row = QHBoxLayout()
+        self.current_map_label = label(self.current_map_name or "No map selected", "muted")
+        map_row.addWidget(self.current_map_label, 1)
+        map_row.addWidget(make_button("Open Map Library", self._toggle_map_library, secondary=True))
+        controls_layout.addLayout(map_row)
+
+        controls_layout.addWidget(label("Overlay Position", "sectionTitle"))
+        self.position_picker = PositionPicker(self.config)
+        self.position_picker.setMinimumHeight(170)
+        self.position_picker.position_changed.connect(self._set_position_grid)
+        controls_layout.addWidget(self.position_picker)
+
+        controls_layout.addWidget(label("Overlay Scale", "sectionTitle"))
+        self._add_slider(controls_layout, "Opacity", self.config.overlay.opacity, 0.2, 1.0, self._set_opacity)
+        self._add_slider(controls_layout, "Size", self.config.overlay.size, 120, 720, self._set_size)
+        self.map_settings_button = make_button("Show Advanced Map Settings", self._toggle_map_settings, secondary=True)
+        controls_layout.addWidget(self.map_settings_button)
+
+        self.map_settings_frame = card("darkCard")
+        settings_layout = QVBoxLayout(self.map_settings_frame)
+        settings_layout.setContentsMargins(14, 14, 14, 14)
+        settings_layout.setSpacing(12)
+        self._build_monitor_picker(settings_layout)
+        self._add_slider(settings_layout, "Zoom", self.config.overlay.zoom, 0.4, 2.4, self._set_zoom)
+        self._add_slider(settings_layout, "Corner radius", self.config.overlay.corner_radius, 0, 80, self._set_radius)
+        self._add_slider(settings_layout, "Animation speed", self.config.overlay.animation_speed, 0.25, 3.0, self._set_animation_speed)
+        self.rotate_check = QCheckBox("Minimap rotation ready")
+        self.rotate_check.setChecked(self.config.overlay.rotate_with_minimap)
+        self.rotate_check.toggled.connect(self._set_rotation)
+        settings_layout.addWidget(self.rotate_check)
+        self._build_profile_picker(settings_layout)
+        controls_layout.addWidget(self.map_settings_frame)
+        controls_layout.addStretch(1)
+        self._apply_map_settings_visibility()
+        layout.addWidget(controls)
+
+        preview_card = card()
+        preview_layout = QVBoxLayout(preview_card)
+        preview_layout.setContentsMargins(24, 24, 24, 20)
+        preview_layout.setSpacing(14)
+        preview_header = QVBoxLayout()
+        preview_header.addWidget(label("Live Preview", "sectionTitle"))
+        preview_header.addWidget(label("This is how your overlay will look in-game.", "muted"))
+        preview_layout.addLayout(preview_header)
+        self.preview_label = QLabel("No map selected")
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_label.setMinimumHeight(430)
+        self.preview_label.setStyleSheet(
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            "stop:0 #050607, stop:0.55 #09100E, stop:1 #16090A);"
+            f"border: 1px solid {COLORS['border']}; border-radius: 8px;"
+        )
+        preview_layout.addWidget(self.preview_label, 1)
+        self.preview_streak_frame = card("darkCard")
+        streak_layout = QVBoxLayout(self.preview_streak_frame)
+        streak_layout.setContentsMargins(12, 8, 12, 8)
+        self.preview_streak_title = label("", "hudTitle")
+        self.preview_streak_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_streak_detail = label("", "muted")
+        self.preview_streak_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        streak_layout.addWidget(self.preview_streak_title)
+        streak_layout.addWidget(self.preview_streak_detail)
+        preview_layout.addWidget(self.preview_streak_frame)
+        self.preview_toggle_hotkey_label = label(self._toggle_overlay_hotkey_text(), "muted")
+        preview_layout.addWidget(self.preview_toggle_hotkey_label)
+        self.preview = QtPreviewRenderer(self.preview_label, self.config)
+        self._refresh_escape_streak_preview()
+        layout.addWidget(preview_card, 1)
+        return page
+
     def _build_escape_streak_tab(self) -> QWidget:
         page = QWidget()
         layout = QHBoxLayout(page)
@@ -884,6 +1130,40 @@ class OverlayQtApp(QMainWindow):
         row.addWidget(make_button("-1", lambda: self.streak_spin.setValue(max(0, self.streak_spin.value() - 1)), secondary=True))
         row.addWidget(make_button("Reset", lambda: self.streak_spin.setValue(0), secondary=True))
         left_layout.addLayout(row)
+
+        online = card("darkCard")
+        online_layout = QVBoxLayout(online)
+        online_layout.setContentsMargins(12, 12, 12, 12)
+        online_layout.setSpacing(8)
+        online_layout.addWidget(label("Online Lobby", "sectionTitle"))
+        self.streak_sync_enabled_check = QCheckBox("Sync this streak with friends")
+        self.streak_sync_enabled_check.setChecked(self.config.escape_streak.sync_enabled)
+        self.streak_sync_enabled_check.toggled.connect(self._set_streak_sync_enabled)
+        online_layout.addWidget(self.streak_sync_enabled_check)
+        online_layout.addWidget(label("Sync server URL", "muted"))
+        self.streak_server_entry = QLineEdit(self.config.escape_streak.sync_server_url)
+        self.streak_server_entry.setPlaceholderText("https://your-worker.your-domain.workers.dev")
+        self.streak_server_entry.textChanged.connect(self._sync_escape_streak_settings)
+        online_layout.addWidget(self.streak_server_entry)
+        online_layout.addWidget(label("Your display name", "muted"))
+        self.streak_player_name_entry = QLineEdit(self.config.escape_streak.sync_player_name)
+        self.streak_player_name_entry.setPlaceholderText("Your name")
+        self.streak_player_name_entry.textChanged.connect(self._sync_escape_streak_settings)
+        online_layout.addWidget(self.streak_player_name_entry)
+        online_layout.addWidget(label("Lobby code", "muted"))
+        self.streak_online_code_entry = QLineEdit(self.config.escape_streak.sync_lobby_code)
+        self.streak_online_code_entry.setPlaceholderText("BLOOD-742")
+        self.streak_online_code_entry.textChanged.connect(self._sync_escape_streak_settings)
+        online_layout.addWidget(self.streak_online_code_entry)
+        online_actions = QHBoxLayout()
+        online_actions.addWidget(make_button("Create Code", self._create_streak_lobby))
+        online_actions.addWidget(make_button("Join Code", self._join_streak_lobby, secondary=True))
+        online_actions.addWidget(make_button("Push Now", self._push_streak_lobby_now, secondary=True))
+        online_layout.addLayout(online_actions)
+        self.streak_sync_status_label = label("Online sync idle.", "muted")
+        online_layout.addWidget(self.streak_sync_status_label)
+        left_layout.addWidget(online)
+
         left_layout.addStretch(1)
         layout.addWidget(left, 2)
 
@@ -1101,7 +1381,10 @@ class OverlayQtApp(QMainWindow):
     def _apply_map_library_visibility(self) -> None:
         visible = self.config.map_library_visible
         self.sidebar.setVisible(visible)
-        self.sidebar_show_button.setVisible(not visible)
+        if hasattr(self, "sidebar_show_button"):
+            self.sidebar_show_button.setVisible(not visible)
+        if hasattr(self, "map_library_nav_button"):
+            self.map_library_nav_button.setChecked(visible)
         self.map_toggle_button.setText("Hide" if visible else "Show")
 
     def _toggle_map_settings(self) -> None:
@@ -1134,6 +1417,8 @@ class OverlayQtApp(QMainWindow):
             self.overlay.clear_ocr_readout()
         if self.preview:
             self.preview.set_asset(asset)
+        if hasattr(self, "current_map_label"):
+            self.current_map_label.setText(name)
         self.plugins.emit_map_changed(name)
         self._highlight_current_map()
         self._save_later()
@@ -1287,18 +1572,31 @@ class OverlayQtApp(QMainWindow):
         self.overlay.refresh_settings()
         self._refresh_escape_streak_preview()
         self._save_later()
+        self._push_streak_state_if_connected()
 
     def _sync_escape_streak_settings(self) -> None:
+        if self._streak_applying_remote:
+            return
         self.config.escape_streak.enabled = self.streak_enabled_check.isChecked()
         self.config.escape_streak.lobby_code = self.lobby_code_entry.text().strip()
         self.config.escape_streak.streak = int(self.streak_spin.value())
+        if hasattr(self, "streak_sync_enabled_check"):
+            self.config.escape_streak.sync_enabled = self.streak_sync_enabled_check.isChecked()
+        if hasattr(self, "streak_server_entry"):
+            self.config.escape_streak.sync_server_url = self.streak_server_entry.text().strip()
+        if hasattr(self, "streak_player_name_entry"):
+            self.config.escape_streak.sync_player_name = self.streak_player_name_entry.text().strip()
+        if hasattr(self, "streak_online_code_entry"):
+            self.config.escape_streak.sync_lobby_code = self.streak_online_code_entry.text().strip().upper()
         players = []
         for name_entry, status_menu in zip(self.player_name_entries, self.player_status_menus):
             players.append(EscapeStreakPlayer(name=name_entry.text().strip(), status=status_menu.currentText()))
         self.config.escape_streak.players = (players + [EscapeStreakPlayer() for _ in range(4)])[:4]
         self.overlay.refresh_settings()
         self._refresh_escape_streak_preview()
+        self._apply_streak_sync_timer_state()
         self._save_later()
+        self._push_streak_state_if_connected()
 
     def _refresh_escape_streak_preview(self) -> None:
         if not hasattr(self, "preview_streak_frame"):
@@ -1311,6 +1609,209 @@ class OverlayQtApp(QMainWindow):
         players = [f"P{idx + 1}:{player.status[:1].upper()}" for idx, player in enumerate(streak.players[:4])]
         self.preview_streak_title.setText(f"ESCAPE STREAK  {max(0, int(streak.streak))}")
         self.preview_streak_detail.setText(f"{lobby}  |  {'  '.join(players)}")
+
+    def _set_streak_sync_enabled(self, checked: bool) -> None:
+        self.config.escape_streak.sync_enabled = checked
+        self._sync_escape_streak_settings()
+        self._set_streak_sync_status("Online sync enabled." if checked else "Online sync disabled.")
+
+    def _apply_streak_sync_timer_state(self) -> None:
+        streak = self.config.escape_streak
+        should_poll = bool(streak.sync_enabled and streak.sync_server_url.strip() and streak.sync_lobby_code.strip())
+        if should_poll and not self._streak_sync_timer.isActive():
+            self._streak_sync_timer.start(2500)
+        elif not should_poll:
+            self._streak_sync_timer.stop()
+
+    def _set_streak_sync_status(self, message: str) -> None:
+        if hasattr(self, "streak_sync_status_label"):
+            self.streak_sync_status_label.setText(message)
+        self.logger.info("Streak sync: %s", message)
+
+    def _streak_client(self) -> StreakSyncClient:
+        return StreakSyncClient(self.config.escape_streak.sync_server_url)
+
+    def _create_streak_lobby(self) -> None:
+        self._sync_escape_streak_settings()
+        self._set_streak_sync_status("Creating online lobby...")
+
+        def worker() -> None:
+            try:
+                data = self._streak_client().create_lobby(
+                    self.config.escape_streak.sync_player_id,
+                    self.config.escape_streak.sync_player_name,
+                    self.config.escape_streak,
+                )
+            except Exception as exc:
+                self.bus.run_on_main.emit(lambda error=exc: self._set_streak_sync_status(str(error)))
+                return
+            self.bus.run_on_main.emit(lambda result=data: self._finish_streak_lobby_join(result, "Created"))
+
+        threading.Thread(target=worker, name="StreakLobbyCreate", daemon=True).start()
+
+    def _join_streak_lobby(self) -> None:
+        self._sync_escape_streak_settings()
+        self._set_streak_sync_status("Joining online lobby...")
+
+        def worker() -> None:
+            try:
+                data = self._streak_client().join_lobby(
+                    self.config.escape_streak.sync_lobby_code,
+                    self.config.escape_streak.sync_player_id,
+                    self.config.escape_streak.sync_player_name,
+                )
+            except Exception as exc:
+                self.bus.run_on_main.emit(lambda error=exc: self._set_streak_sync_status(str(error)))
+                return
+            self.bus.run_on_main.emit(lambda result=data: self._finish_streak_lobby_join(result, "Joined"))
+
+        threading.Thread(target=worker, name="StreakLobbyJoin", daemon=True).start()
+
+    def _finish_streak_lobby_join(self, data: dict, action: str) -> None:
+        code = str(data.get("code", "")).upper()
+        state = data.get("state", {})
+        if code:
+            self.config.escape_streak.sync_lobby_code = code
+            self.config.escape_streak.lobby_code = code
+        self.config.escape_streak.sync_enabled = True
+        self._apply_remote_streak_state(state)
+        self._refresh_streak_sync_widgets()
+        self._apply_streak_sync_timer_state()
+        self._save_later()
+        self._set_streak_sync_status(f"{action} lobby {self.config.escape_streak.sync_lobby_code}.")
+
+    def _push_streak_lobby_now(self) -> None:
+        self._sync_escape_streak_settings()
+        self._push_streak_state_if_connected(force=True)
+
+    def _push_streak_state_if_connected(self, force: bool = False) -> None:
+        streak = self.config.escape_streak
+        if not force and not streak.sync_enabled:
+            return
+        if not (streak.sync_server_url.strip() and streak.sync_lobby_code.strip()):
+            return
+        if self._streak_sync_busy:
+            return
+        self._streak_sync_busy = True
+
+        def worker() -> None:
+            try:
+                data = self._streak_client().push_state(
+                    self.config.escape_streak.sync_lobby_code,
+                    self.config.escape_streak.sync_player_id,
+                    self.config.escape_streak,
+                )
+            except Exception as exc:
+                self.bus.run_on_main.emit(lambda error=exc: self._finish_streak_sync_error(error))
+                return
+            self.bus.run_on_main.emit(lambda result=data: self._finish_streak_sync_push(result))
+
+        threading.Thread(target=worker, name="StreakLobbyPush", daemon=True).start()
+
+    def _poll_streak_lobby(self) -> None:
+        if self._streak_sync_busy:
+            return
+        streak = self.config.escape_streak
+        if not (streak.sync_enabled and streak.sync_server_url.strip() and streak.sync_lobby_code.strip()):
+            self._apply_streak_sync_timer_state()
+            return
+        self._streak_sync_busy = True
+
+        def worker() -> None:
+            try:
+                data = self._streak_client().fetch_lobby(self.config.escape_streak.sync_lobby_code)
+            except Exception as exc:
+                self.bus.run_on_main.emit(lambda error=exc: self._finish_streak_sync_error(error))
+                return
+            self.bus.run_on_main.emit(lambda result=data: self._finish_streak_sync_poll(result))
+
+        threading.Thread(target=worker, name="StreakLobbyPoll", daemon=True).start()
+
+    def _finish_streak_sync_push(self, data: dict) -> None:
+        self._streak_sync_busy = False
+        state = data.get("state", {})
+        if isinstance(state, dict):
+            self.config.escape_streak.sync_revision = int(state.get("sync_revision", self.config.escape_streak.sync_revision) or 0)
+        self._set_streak_sync_status(f"Synced lobby {self.config.escape_streak.sync_lobby_code}.")
+
+    def _finish_streak_sync_poll(self, data: dict) -> None:
+        self._streak_sync_busy = False
+        state = data.get("state", {})
+        if isinstance(state, dict):
+            remote_revision = int(state.get("sync_revision", 0) or 0)
+            if remote_revision >= self.config.escape_streak.sync_revision:
+                self._apply_remote_streak_state(state)
+                self._refresh_streak_sync_widgets()
+                self.overlay.refresh_settings()
+                self._refresh_escape_streak_preview()
+        self._set_streak_sync_status(f"Connected to {self.config.escape_streak.sync_lobby_code}.")
+
+    def _finish_streak_sync_error(self, error: Exception) -> None:
+        self._streak_sync_busy = False
+        self._set_streak_sync_status(str(error))
+
+    def _apply_remote_streak_state(self, state: dict) -> None:
+        if not isinstance(state, dict):
+            return
+        self._streak_applying_remote = True
+        try:
+            streak = self.config.escape_streak
+            streak.enabled = bool(state.get("enabled", streak.enabled))
+            streak.lobby_code = str(state.get("lobby_code", streak.lobby_code))
+            streak.streak = int(state.get("streak", streak.streak) or 0)
+            streak.sync_revision = int(state.get("sync_revision", streak.sync_revision) or 0)
+            players = []
+            for item in state.get("players", [])[:4]:
+                if isinstance(item, dict):
+                    players.append(
+                        EscapeStreakPlayer(
+                            name=str(item.get("name", "")),
+                            status=str(item.get("status", "Ready")),
+                        )
+                    )
+            streak.players = (players + [EscapeStreakPlayer() for _ in range(4)])[:4]
+            self._refresh_streak_widgets()
+        finally:
+            self._streak_applying_remote = False
+
+    def _refresh_streak_widgets(self) -> None:
+        if not hasattr(self, "streak_enabled_check"):
+            return
+        streak = self.config.escape_streak
+        self.streak_enabled_check.blockSignals(True)
+        self.streak_enabled_check.setChecked(streak.enabled)
+        self.streak_enabled_check.blockSignals(False)
+        self.lobby_code_entry.blockSignals(True)
+        self.lobby_code_entry.setText(streak.lobby_code)
+        self.lobby_code_entry.blockSignals(False)
+        self.streak_spin.blockSignals(True)
+        self.streak_spin.setValue(max(0, int(streak.streak)))
+        self.streak_spin.blockSignals(False)
+        for idx, (name_entry, status_menu) in enumerate(zip(self.player_name_entries, self.player_status_menus)):
+            player = streak.players[idx] if idx < len(streak.players) else EscapeStreakPlayer()
+            name_entry.blockSignals(True)
+            name_entry.setText(player.name)
+            name_entry.blockSignals(False)
+            status_menu.blockSignals(True)
+            status_menu.setCurrentText(player.status if player.status in ["Ready", "Escaped", "Dead", "Disconnected"] else "Ready")
+            status_menu.blockSignals(False)
+
+    def _refresh_streak_sync_widgets(self) -> None:
+        if not hasattr(self, "streak_sync_enabled_check"):
+            return
+        streak = self.config.escape_streak
+        for widget, value in (
+            (self.streak_sync_enabled_check, streak.sync_enabled),
+            (self.streak_server_entry, streak.sync_server_url),
+            (self.streak_player_name_entry, streak.sync_player_name),
+            (self.streak_online_code_entry, streak.sync_lobby_code),
+        ):
+            widget.blockSignals(True)
+            if isinstance(widget, QCheckBox):
+                widget.setChecked(bool(value))
+            else:
+                widget.setText(str(value))
+            widget.blockSignals(False)
 
     def _set_performance_mode(self, checked: bool) -> None:
         self.config.detection.performance_mode = checked
