@@ -12,7 +12,7 @@ import threading
 import uuid
 
 from PIL import Image
-from PySide6.QtCore import QObject, QPointF, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QImage, QLinearGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -344,14 +344,69 @@ class PreviewStageLabel(QLabel):
         super().paintEvent(event)
 
 
-class ClawLogo(QWidget):
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(46, 46)
+class ToggleSwitch(QCheckBox):
+    def __init__(self, text: str = "", parent=None) -> None:
+        super().__init__(text, parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimumHeight(32)
+
+    def sizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        return QSize(max(hint.width() + 36, 150), max(hint.height(), 32))
 
     def paintEvent(self, _event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        track = QRectF(0, (self.height() - 24) / 2, 48, 24)
+        checked = self.isChecked()
+        enabled = self.isEnabled()
+        track_gradient = QLinearGradient(track.left(), track.top(), track.right(), track.bottom())
+        if checked:
+            track_gradient.setColorAt(0.0, QColor("#7E111A" if enabled else "#3B2427"))
+            track_gradient.setColorAt(1.0, QColor("#D72034" if enabled else "#5A3034"))
+        else:
+            track_gradient.setColorAt(0.0, QColor("#171214"))
+            track_gradient.setColorAt(1.0, QColor("#2B2325"))
+        painter.setBrush(track_gradient)
+        painter.setPen(QPen(QColor(COLORS["border"]), 1))
+        painter.drawRoundedRect(track, 12, 12)
+
+        knob_size = 20
+        knob_x = track.right() - knob_size - 2 if checked else track.left() + 2
+        knob = QRectF(knob_x, track.top() + 2, knob_size, knob_size)
+        knob_gradient = QLinearGradient(knob.left(), knob.top(), knob.right(), knob.bottom())
+        knob_gradient.setColorAt(0.0, QColor("#FFFFFF" if enabled else "#B8B8B8"))
+        knob_gradient.setColorAt(1.0, QColor("#DADADA" if enabled else "#8C8C8C"))
+        painter.setBrush(knob_gradient)
+        painter.setPen(QPen(QColor(255, 255, 255, 80), 1))
+        painter.drawEllipse(knob)
+
+        painter.setPen(QColor(COLORS["text"] if enabled else COLORS["muted"]))
+        painter.setFont(self.font())
+        text_rect = QRectF(60, 0, max(0, self.width() - 60), self.height())
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.text())
+
+
+class ClawLogo(QWidget):
+    def __init__(self, icon_path: Path | None = None, parent=None) -> None:
+        super().__init__(parent)
+        self.icon = QPixmap(str(icon_path)) if icon_path and icon_path.exists() else QPixmap()
+        self.setFixedSize(56, 56)
+
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.icon.isNull():
+            target = QPixmap(self.size())
+            target.fill(Qt.GlobalColor.transparent)
+            icon_painter = QPainter(target)
+            scaled = self.icon.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            icon_painter.drawPixmap((self.width() - scaled.width()) // 2, (self.height() - scaled.height()) // 2, scaled)
+            icon_painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            icon_painter.fillRect(target.rect(), QColor(COLORS["accent"]))
+            icon_painter.end()
+            painter.drawPixmap(0, 0, target)
+            return
         painter.setPen(QPen(QColor(COLORS["accent"]), 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         for idx, x in enumerate((14, 23, 32)):
             painter.drawLine(x, 8 + idx * 2, x - 4, 35)
@@ -359,13 +414,15 @@ class ClawLogo(QWidget):
 
 
 class NavButton(QPushButton):
-    def __init__(self, icon_name: str, text: str, parent=None) -> None:
+    def __init__(self, icon_name: str, text: str, icon_dir: Path | None = None, parent=None) -> None:
         super().__init__(parent)
         self.icon_name = icon_name
         self.nav_text = text
+        icon_path = icon_dir / f"{icon_name}.png" if icon_dir else None
+        self.icon_pixmap = QPixmap(str(icon_path)) if icon_path and icon_path.exists() else QPixmap()
         self.setCheckable(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedSize(124, 96)
+        self.setFixedSize(124, 104)
         self.setStyleSheet("background: transparent; border: 0;")
 
     def paintEvent(self, _event) -> None:
@@ -374,18 +431,36 @@ class NavButton(QPushButton):
         rect = self.rect().adjusted(1, 1, -1, -1)
         selected = self.isChecked()
         if selected:
-            painter.fillRect(rect, QColor(45, 9, 13, 205))
+            painter.fillRect(rect, QColor(7, 6, 7, 232))
+            painter.fillRect(rect.adjusted(1, 1, -1, -1), QColor(37, 9, 13, 78))
+            painter.setPen(QPen(QColor(101, 23, 29, 115), 1))
+            for idx in range(26):
+                x = 8 + (idx * 37) % max(1, rect.width() - 16)
+                y = 7 + (idx * 23) % max(1, rect.height() - 14)
+                painter.drawLine(x, y, min(rect.right() - 5, x + 11), max(rect.top() + 5, y - 5))
             painter.setPen(QPen(QColor(COLORS["accent"]), 2))
-            painter.drawRoundedRect(QRectF(rect.adjusted(4, 4, -4, -4)), 4, 4)
+            painter.drawRect(rect.adjusted(3, 3, -3, -3))
         elif self.underMouse():
             painter.fillRect(rect, QColor(30, 18, 20, 150))
         color = QColor(COLORS["accent"] if selected else "#8D8D8D")
-        self._draw_icon(painter, QRectF(37, 13, 50, 44), color)
+        self._draw_icon(painter, QRectF(37, 15, 50, 46), color)
         painter.setPen(QColor(COLORS["accent"] if selected else COLORS["muted"]))
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        painter.drawText(QRectF(6, 63, self.width() - 12, 23), Qt.AlignmentFlag.AlignCenter, self.nav_text.upper())
+        painter.drawText(QRectF(6, 69, self.width() - 12, 24), Qt.AlignmentFlag.AlignCenter, self.nav_text.upper())
 
     def _draw_icon(self, painter: QPainter, rect: QRectF, color: QColor) -> None:
+        if not self.icon_pixmap.isNull():
+            target_size = QSize(max(1, int(rect.width())), max(1, int(rect.height())))
+            target = QPixmap(target_size)
+            target.fill(Qt.GlobalColor.transparent)
+            icon_painter = QPainter(target)
+            scaled = self.icon_pixmap.scaled(target_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            icon_painter.drawPixmap((target.width() - scaled.width()) // 2, (target.height() - scaled.height()) // 2, scaled)
+            icon_painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            icon_painter.fillRect(target.rect(), color)
+            icon_painter.end()
+            painter.drawPixmap(int(rect.left()), int(rect.top()), target)
+            return
         painter.setPen(QPen(color, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         cx = rect.center().x()
@@ -911,7 +986,7 @@ class OverlayQtApp(QMainWindow):
         top.setObjectName("topBar")
         top_layout = QHBoxLayout(top)
         top_layout.setContentsMargins(18, 8, 18, 8)
-        top_layout.addWidget(ClawLogo())
+        top_layout.addWidget(ClawLogo(self._resource_path("assets", "nav_icons", "logo.png")))
         title_box = QVBoxLayout()
         title_box.setSpacing(0)
         title = label("DBD Companion Overlay", "title")
@@ -937,7 +1012,8 @@ class OverlayQtApp(QMainWindow):
         nav_layout = QVBoxLayout(nav)
         nav_layout.setContentsMargins(0, 10, 0, 10)
         nav_layout.setSpacing(0)
-        self.map_library_nav_button = NavButton("maps", "Maps")
+        icon_dir = self._resource_path("assets", "nav_icons")
+        self.map_library_nav_button = NavButton("overlay", "Maps", icon_dir)
         self.map_library_nav_button.clicked.connect(self._toggle_map_library)
         nav_layout.addWidget(self.map_library_nav_button)
         nav_layout.addSpacing(6)
@@ -978,16 +1054,16 @@ class OverlayQtApp(QMainWindow):
         body.addWidget(content, 1)
 
         pages = [
-            ("claw", "General", self._build_overlay_tab()),
-            ("streak", "Players", self._build_escape_streak_tab()),
-            ("ocr", "OCR", self._build_detection_tab()),
-            ("keys", "Hotkeys", self._build_hotkeys_tab()),
-            ("settings", "Settings", self._build_settings_tab()),
-            ("logs", "Logs", self._build_logs_tab()),
+            ("general", "General", self._build_overlay_tab()),
+            ("players", "Players", self._build_escape_streak_tab()),
+            ("overlay", "OCR", self._build_detection_tab()),
+            ("hotkeys", "Hotkeys", self._build_hotkeys_tab()),
+            ("appearance", "Settings", self._build_settings_tab()),
+            ("about", "Logs", self._build_logs_tab()),
         ]
         self.nav_buttons: list[NavButton] = []
         for index, (icon_name, page_name, page) in enumerate(pages):
-            button = NavButton(icon_name, page_name)
+            button = NavButton(icon_name, page_name, icon_dir)
             button.clicked.connect(lambda _checked=False, idx=index: self._set_nav_page(idx))
             nav_layout.addWidget(button)
             self.nav_buttons.append(button)
@@ -1021,7 +1097,7 @@ class OverlayQtApp(QMainWindow):
         controls_scroll.setWidget(controls)
 
         controls_layout.addWidget(label("Overlay Enabled", "sectionTitle"))
-        self.enabled_check = QCheckBox("Enable in-game overlay")
+        self.enabled_check = ToggleSwitch("Enable in-game overlay")
         self.enabled_check.setChecked(self.config.overlay.enabled)
         self.enabled_check.toggled.connect(self._toggle_enabled)
         controls_layout.addWidget(self.enabled_check)
@@ -1061,7 +1137,7 @@ class OverlayQtApp(QMainWindow):
         self._add_slider(settings_layout, "Zoom", self.config.overlay.zoom, 0.4, 2.4, self._set_zoom)
         self._add_slider(settings_layout, "Corner radius", self.config.overlay.corner_radius, 0, 80, self._set_radius)
         self._add_slider(settings_layout, "Animation speed", self.config.overlay.animation_speed, 0.25, 3.0, self._set_animation_speed)
-        self.rotate_check = QCheckBox("Minimap rotation ready")
+        self.rotate_check = ToggleSwitch("Minimap rotation ready")
         self.rotate_check.setChecked(self.config.overlay.rotate_with_minimap)
         self.rotate_check.toggled.connect(self._set_rotation)
         settings_layout.addWidget(self.rotate_check)
@@ -1113,7 +1189,7 @@ class OverlayQtApp(QMainWindow):
         left_layout.setContentsMargins(18, 18, 18, 18)
         left_layout.setSpacing(14)
         left_layout.addWidget(label("Escape Streak", "sectionTitle"))
-        self.streak_enabled_check = QCheckBox("Show streak under the map")
+        self.streak_enabled_check = ToggleSwitch("Show streak under the map")
         self.streak_enabled_check.setChecked(self.config.escape_streak.enabled)
         self.streak_enabled_check.toggled.connect(self._set_escape_streak_enabled)
         left_layout.addWidget(self.streak_enabled_check)
@@ -1138,7 +1214,7 @@ class OverlayQtApp(QMainWindow):
         online_layout.setContentsMargins(12, 12, 12, 12)
         online_layout.setSpacing(8)
         online_layout.addWidget(label("Online Lobby", "sectionTitle"))
-        self.streak_sync_enabled_check = QCheckBox("Sync this streak with friends")
+        self.streak_sync_enabled_check = ToggleSwitch("Sync this streak with friends")
         self.streak_sync_enabled_check.setChecked(self.config.escape_streak.sync_enabled)
         self.streak_sync_enabled_check.toggled.connect(self._set_streak_sync_enabled)
         online_layout.addWidget(self.streak_sync_enabled_check)
@@ -1191,11 +1267,11 @@ class OverlayQtApp(QMainWindow):
         left = card()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(18, 18, 18, 18)
-        self.performance_check = QCheckBox("Performance mode")
+        self.performance_check = ToggleSwitch("Performance mode")
         self.performance_check.setChecked(self.config.detection.performance_mode)
         self.performance_check.toggled.connect(self._set_performance_mode)
         left_layout.addWidget(self.performance_check)
-        self.template_check = QCheckBox("Fallback template matching")
+        self.template_check = ToggleSwitch("Fallback template matching")
         self.template_check.setChecked(self.config.detection.fallback_template_matching)
         self.template_check.toggled.connect(self._set_template_mode)
         left_layout.addWidget(self.template_check)
@@ -1208,7 +1284,7 @@ class OverlayQtApp(QMainWindow):
         right_layout.setContentsMargins(18, 18, 18, 18)
         right_layout.setSpacing(10)
         right_layout.addWidget(label("OCR Scan Region", "sectionTitle"))
-        self.auto_region_check = QCheckBox("Auto position from screen resolution")
+        self.auto_region_check = ToggleSwitch("Auto position from screen resolution")
         self.auto_region_check.setChecked(self.config.detection.auto_ocr_region)
         self.auto_region_check.toggled.connect(self._toggle_auto_region)
         right_layout.addWidget(self.auto_region_check)

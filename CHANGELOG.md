@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 2.5
+
+- Extracted transparent navigation icon assets from the concept-art reference and wired them into the Qt side rail.
+- Rebuilt the selected tab state with a red border and subtle scratched texture treatment.
+- Replaced checkbox indicators with custom red pill toggles with white knobs.
+- Regenerated the app logo assets from the extracted claw-mark concept logo.
+
 ## Beta 2.4
 
 - Reworked the companion UI with a darker forest-style background, custom painted navigation icons, and a staged live preview.
