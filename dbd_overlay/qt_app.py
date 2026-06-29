@@ -324,10 +324,34 @@ class HorrorRoot(QWidget):
 
 
 class PreviewStageLabel(QLabel):
+    def __init__(self, text: str = "", background_path: Path | None = None, parent=None) -> None:
+        super().__init__(text, parent)
+        self.background = QPixmap(str(background_path)) if background_path and background_path.exists() else QPixmap()
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect()
+        if not self.background.isNull():
+            painter.fillRect(rect, QColor("#000000"))
+            scaled = self.background.scaled(
+                rect.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            x = (rect.width() - scaled.width()) // 2
+            y = (rect.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+            shade = QLinearGradient(0, 0, 0, rect.height())
+            shade.setColorAt(0.0, QColor(0, 0, 0, 115))
+            shade.setColorAt(0.48, QColor(0, 0, 0, 18))
+            shade.setColorAt(1.0, QColor(0, 0, 0, 150))
+            painter.fillRect(rect, shade)
+            painter.setPen(QPen(QColor(COLORS["border"]), 1))
+            painter.drawRoundedRect(rect.adjusted(1, 1, -2, -2), 8, 8)
+            super().paintEvent(event)
+            return
+
         gradient = QLinearGradient(0, 0, rect.width(), rect.height())
         gradient.setColorAt(0.0, QColor("#020202"))
         gradient.setColorAt(0.42, QColor("#080607"))
@@ -1191,7 +1215,7 @@ class OverlayQtApp(QMainWindow):
         preview_header = QVBoxLayout()
         preview_header.addWidget(label("Live Preview", "sectionTitle"))
         preview_layout.addLayout(preview_header)
-        self.preview_label = PreviewStageLabel("No map selected")
+        self.preview_label = PreviewStageLabel("No map selected", self._resource_path("assets", "live_preview_background.png"))
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setMinimumHeight(470)
         self.preview_label.setStyleSheet(
@@ -1256,11 +1280,6 @@ class OverlayQtApp(QMainWindow):
         self.streak_sync_enabled_check.setChecked(self.config.escape_streak.sync_enabled)
         self.streak_sync_enabled_check.toggled.connect(self._set_streak_sync_enabled)
         online_layout.addWidget(self.streak_sync_enabled_check)
-        online_layout.addWidget(label("Player tag", "muted"))
-        self.streak_player_tag_entry = QLineEdit(self.config.escape_streak.sync_player_tag)
-        self.streak_player_tag_entry.setPlaceholderText("Name#3213")
-        self.streak_player_tag_entry.textChanged.connect(self._sync_escape_streak_settings)
-        online_layout.addWidget(self.streak_player_tag_entry)
         online_layout.addWidget(label("Lobby code", "muted"))
         code_row = QHBoxLayout()
         self.streak_online_code_entry = QLineEdit(self.config.escape_streak.sync_lobby_code)
@@ -1680,9 +1699,6 @@ class OverlayQtApp(QMainWindow):
         self.config.escape_streak.streak = int(self.streak_spin.value())
         if hasattr(self, "streak_sync_enabled_check"):
             self.config.escape_streak.sync_enabled = self.streak_sync_enabled_check.isChecked()
-        if hasattr(self, "streak_player_tag_entry"):
-            self.config.escape_streak.sync_player_tag = self.streak_player_tag_entry.text().strip()
-            self.config.escape_streak.sync_player_name = self.config.escape_streak.sync_player_tag
         if hasattr(self, "streak_online_code_entry"):
             self.config.escape_streak.sync_lobby_code = self.streak_online_code_entry.text().strip().upper()
         if getattr(self, "player_name_entries", None) and getattr(self, "player_status_menus", None):
@@ -1742,6 +1758,16 @@ class OverlayQtApp(QMainWindow):
             self.config.escape_streak.sync_server_url = packaged
         return packaged
 
+    def _ensure_streak_identity(self) -> str:
+        streak = self.config.escape_streak
+        if not streak.sync_player_id:
+            streak.sync_player_id = uuid.uuid4().hex
+        if "#" not in streak.sync_player_tag:
+            suffix = str(int(streak.sync_player_id[:8], 16) % 10000).zfill(4)
+            streak.sync_player_tag = f"Player#{suffix}"
+        streak.sync_player_name = ""
+        return streak.sync_player_tag
+
     def _copy_streak_lobby_code(self) -> None:
         code = self.config.escape_streak.sync_lobby_code.strip().upper()
         if code:
@@ -1750,13 +1776,14 @@ class OverlayQtApp(QMainWindow):
 
     def _create_streak_lobby(self) -> None:
         self._sync_escape_streak_settings()
+        player_tag = self._ensure_streak_identity()
         self._set_streak_sync_status("Creating online lobby...")
 
         def worker() -> None:
             try:
                 data = self._streak_client().create_lobby(
                     self.config.escape_streak.sync_player_id,
-                    self.config.escape_streak.sync_player_tag,
+                    player_tag,
                     self.config.escape_streak,
                 )
             except Exception as exc:
@@ -1768,6 +1795,7 @@ class OverlayQtApp(QMainWindow):
 
     def _join_streak_lobby(self) -> None:
         self._sync_escape_streak_settings()
+        player_tag = self._ensure_streak_identity()
         self._set_streak_sync_status("Joining online lobby...")
 
         def worker() -> None:
@@ -1775,7 +1803,7 @@ class OverlayQtApp(QMainWindow):
                 data = self._streak_client().join_lobby(
                     self.config.escape_streak.sync_lobby_code,
                     self.config.escape_streak.sync_player_id,
-                    self.config.escape_streak.sync_player_tag,
+                    player_tag,
                 )
             except Exception as exc:
                 self.bus.run_on_main.emit(lambda error=exc: self._set_streak_sync_status(str(error)))
@@ -1954,8 +1982,6 @@ class OverlayQtApp(QMainWindow):
             return
         streak = self.config.escape_streak
         widgets = [(self.streak_sync_enabled_check, streak.sync_enabled)]
-        if hasattr(self, "streak_player_tag_entry"):
-            widgets.append((self.streak_player_tag_entry, streak.sync_player_tag))
         if hasattr(self, "streak_online_code_entry"):
             widgets.append((self.streak_online_code_entry, streak.sync_lobby_code))
         for widget, value in widgets:
@@ -1973,7 +1999,7 @@ class OverlayQtApp(QMainWindow):
             if idx < len(members):
                 member = members[idx] if isinstance(members[idx], dict) else {}
                 tag = str(member.get("tag", "")).strip() or "Unknown"
-                own = "You" if tag.lower() == self.config.escape_streak.sync_player_tag.lower() else tag
+                own = "You" if tag.lower() == self.config.escape_streak.sync_player_tag.lower() else f"Player {idx + 1}"
                 role = " - Host" if member.get("host") else ""
                 member_label.setText(f"{own}{role}")
             else:

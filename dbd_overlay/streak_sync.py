@@ -101,7 +101,7 @@ class StreakSyncClient:
     def _clean_tag(tag: str) -> str:
         cleaned = tag.strip()
         if "#" not in cleaned:
-            raise StreakSyncError("Enter a name with hashtag number, for example Nikko#3213.")
+            raise StreakSyncError("Could not create the hidden player identity. Restart the app and try again.")
         return cleaned
 
     @staticmethod

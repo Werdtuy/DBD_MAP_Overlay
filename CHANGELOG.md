@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 2.53
+
+- Added a packaged live-preview background image and updated the preview panel to render it behind the map.
+- Removed the visible player-tag setup from Escape Streak lobbies; users now only create or join with lobby codes.
+- Simplified lobby member names to `You` and numbered player slots instead of showing hidden sync identifiers.
+
 ## Beta 2.52
 
 - Removed the redundant large `Maps` rail button and kept map-library access on the existing `Open Map Library` button in Map Selection.
@@ -37,7 +43,7 @@
 
 ## Beta 2.3
 
-- Reworked Escape Streak sync around D1-backed lobby codes with player tags such as `Nikko#3213`.
+- Reworked Escape Streak sync around D1-backed lobby codes.
 - Added a lobby-style app flow with create/join, copyable lobby code, player slots, leave lobby, and shared streak sync.
 - Added Cloudflare D1 schema/migration files for streak profiles and lobbies on your Worker domain.
 - Added encrypted packaged `streak_config.json` support so users do not enter the streak Worker URL.
