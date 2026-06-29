@@ -29,6 +29,7 @@ DEFAULT_UPDATER_CONFIG = {
     "github_token": "",
 }
 LICENSE_CONFIG_FILE = "license_config.json"
+STREAK_CONFIG_FILE = "streak_config.json"
 
 
 def run(command: list[str]) -> None:
@@ -83,11 +84,13 @@ def windows_runtime_dlls() -> list[Path]:
     return found
 
 
-def verify_exe_payload(exe_path: Path) -> None:
+def verify_exe_payload(exe_path: Path, include_streak_config: bool = False) -> None:
     from PyInstaller.archive.readers import CArchiveReader
 
     names = {Path(name).name.lower() for name in CArchiveReader(str(exe_path)).toc}
     expected = {"python312.dll", LICENSE_CONFIG_FILE, *WINDOWS_RUNTIME_DLLS}
+    if include_streak_config:
+        expected.add(STREAK_CONFIG_FILE)
     missing = sorted(name for name in expected if name not in names)
     if missing:
         raise RuntimeError(f"Built executable is missing required runtime files: {', '.join(missing)}")
@@ -137,11 +140,28 @@ def load_license_config(root: Path, prompt_if_missing: bool = False) -> str:
     return encrypted_config
 
 
+def load_streak_config(root: Path) -> str:
+    server_url = os.environ.get("DBD_OVERLAY_STREAK_SERVER_URL", "").strip()
+    config_path = root / STREAK_CONFIG_FILE
+    if not server_url:
+        try:
+            encrypted_config = config_path.read_text(encoding="utf-8")
+            decrypt_server_url(encrypted_config)
+            return encrypted_config
+        except Exception:
+            return ""
+    server_url = server_url.rstrip("/")
+    if not server_url.startswith("https://"):
+        raise RuntimeError("Streak sync server URL must use HTTPS.")
+    return encrypt_server_url(server_url)
+
+
 def create_release_zip(
     root: Path,
     exe_path: Path,
     manifest: dict[str, str],
     encrypted_license_config: str,
+    encrypted_streak_config: str,
 ) -> Path:
     release_dir = root / "release"
     package_dir = release_dir / APP_NAME
@@ -157,6 +177,8 @@ def create_release_zip(
         encoding="utf-8",
     )
     (package_dir / LICENSE_CONFIG_FILE).write_text(encrypted_license_config, encoding="utf-8")
+    if encrypted_streak_config:
+        (package_dir / STREAK_CONFIG_FILE).write_text(encrypted_streak_config, encoding="utf-8")
     (package_dir / "version.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     if zip_path.exists():
@@ -191,6 +213,7 @@ def main() -> int:
         "changelog": release_notes(root / "CHANGELOG.md", app_version),
     }
     encrypted_license_config = load_license_config(root, prompt_if_missing=args.prompt_license_config)
+    encrypted_streak_config = load_streak_config(root)
 
     if not run_py.exists():
         raise FileNotFoundError(f"Could not find {run_py}")
@@ -209,6 +232,9 @@ def main() -> int:
     bundled_config_dir = Path(tempfile.mkdtemp(prefix="dbd-overlay-build-input-"))
     bundled_license_config = bundled_config_dir / LICENSE_CONFIG_FILE
     bundled_license_config.write_text(encrypted_license_config, encoding="utf-8")
+    bundled_streak_config = bundled_config_dir / STREAK_CONFIG_FILE
+    if encrypted_streak_config:
+        bundled_streak_config.write_text(encrypted_streak_config, encoding="utf-8")
     pyinstaller_args = [
         sys.executable,
         "-m",
@@ -241,6 +267,8 @@ def main() -> int:
     if assets_dir.exists():
         pyinstaller_args.extend(["--add-data", f"{assets_dir}{os.pathsep}assets"])
     pyinstaller_args.extend(["--add-data", f"{bundled_license_config}{os.pathsep}."])
+    if encrypted_streak_config:
+        pyinstaller_args.extend(["--add-data", f"{bundled_streak_config}{os.pathsep}."])
     for runtime_dll in windows_runtime_dlls():
         pyinstaller_args.extend(["--add-binary", f"{runtime_dll}{os.pathsep}."])
     print(f"Using icon: {icon_path}", flush=True)
@@ -252,7 +280,7 @@ def main() -> int:
         run(pyinstaller_args)
     finally:
         shutil.rmtree(bundled_config_dir, ignore_errors=True)
-    verify_exe_payload(exe_path)
+    verify_exe_payload(exe_path, include_streak_config=bool(encrypted_streak_config))
     refresh_shell_icons()
 
     (root / "Maps").mkdir(exist_ok=True)
@@ -266,7 +294,7 @@ def main() -> int:
     print("", flush=True)
     print("Build complete:", flush=True)
     print(exe_path, flush=True)
-    zip_path = create_release_zip(root, exe_path, manifest, encrypted_license_config)
+    zip_path = create_release_zip(root, exe_path, manifest, encrypted_license_config, encrypted_streak_config)
     print("", flush=True)
     print("Shareable zip created:", flush=True)
     print(zip_path, flush=True)

@@ -26,6 +26,7 @@ jobs:
         run: python scripts/build.py -Windowed
         env:
           DBD_OVERLAY_LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
+          DBD_OVERLAY_STREAK_SERVER_URL: ${{ secrets.STREAK_SYNC_URL }}
 
       - name: Read package version
         shell: pwsh

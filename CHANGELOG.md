@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta 2.3
+
+- Reworked Escape Streak sync around D1-backed lobby codes with player tags such as `Nikko#3213`.
+- Added a lobby-style app flow with create/join, copyable lobby code, player slots, leave lobby, and shared streak sync.
+- Added Cloudflare D1 schema/migration files for streak profiles and lobbies on your Worker domain.
+- Added encrypted packaged `streak_config.json` support so users do not enter the streak Worker URL.
+- Updated beta packaging and in-app updates to carry the optional streak sync sidecar when available.
+
 ## Beta 2.2
 
 - Added secured admin endpoints to the Escape Streak Worker for listing, inspecting, resetting, updating, and deleting lobbies.

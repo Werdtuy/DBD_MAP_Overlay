@@ -8,6 +8,7 @@ release/
 DBDCompanionOverlay.exe
 startup_error.log
 updater_config.json
+streak_config.json
 version.json
 update_manifest.json
 logs/

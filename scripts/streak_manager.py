@@ -37,7 +37,7 @@ class StreakManagerApp:
         header = tk.Frame(self.root, bg="#111318")
         header.pack(fill="x", padx=18, pady=(16, 8))
         tk.Label(header, text="DBD Streak Manager", font=("Segoe UI Semibold", 22), fg="#f7f2ea", bg="#111318").pack(anchor="w")
-        tk.Label(header, text="Private admin tool for shared Escape Streak lobbies", fg="#c72435", bg="#111318").pack(anchor="w")
+        tk.Label(header, text="Private admin tool for D1-backed Escape Streak lobbies", fg="#c72435", bg="#111318").pack(anchor="w")
 
         connection = tk.Frame(self.root, bg="#111318")
         connection.pack(fill="x", padx=18, pady=8)
@@ -173,7 +173,8 @@ class StreakManagerApp:
         lines.append("")
         lines.append("Members:")
         for member in lobby.get("members", []):
-            lines.append(f"  {member.get('name', '') or member.get('player_id', '')} - {member.get('last_seen', '')}")
+            host = " host" if member.get("host") else ""
+            lines.append(f"  {member.get('tag', '') or member.get('player_id', '')}{host} - {member.get('last_seen', '')}")
         return "\n".join(lines)
 
     def _request(self, method: str, path: str, payload: dict | None = None) -> dict:

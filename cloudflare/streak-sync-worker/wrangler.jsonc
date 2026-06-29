@@ -7,10 +7,11 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
-  "kv_namespaces": [
+  "d1_databases": [
     {
-      "binding": "STREAK_LOBBIES",
-      "id": "replace-with-your-kv-namespace-id"
+      "binding": "STREAK_DB",
+      "database_name": "dbd-streak-sync",
+      "database_id": "replace-with-your-d1-database-id"
     }
   ]
 }

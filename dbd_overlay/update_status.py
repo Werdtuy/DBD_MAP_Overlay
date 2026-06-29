@@ -23,7 +23,8 @@ DEFAULT_CONFIG = {
     "github_token": "",
 }
 APP_EXE = "DBDCompanionOverlay.exe"
-UPDATE_SIDECAR_FILES = ("license_config.json", "updater_config.json", "version.json")
+REQUIRED_UPDATE_SIDECAR_FILES = ("license_config.json", "updater_config.json", "version.json")
+OPTIONAL_UPDATE_SIDECAR_FILES = ("streak_config.json",)
 BETA_VERSION_PATTERN = re.compile(r"^\s*beta\s+(\d+(?:\.\d+)?)\s*$", re.IGNORECASE)
 
 
@@ -180,14 +181,16 @@ def stage_app_update(app_dir: Path, status: AppUpdateStatus, app_pid: int) -> No
         _safe_extract(archive_path, extracted_dir)
         package_dir = _package_root(extracted_dir)
         source_exe = package_dir / APP_EXE
-        for name in UPDATE_SIDECAR_FILES:
+        for name in REQUIRED_UPDATE_SIDECAR_FILES:
             if not (package_dir / name).exists():
                 raise RuntimeError(f"Update package is missing {name}")
 
         script_path = staging_dir / "install_update.cmd"
         sidecar_commands = []
-        for name in UPDATE_SIDECAR_FILES:
+        for name in (*REQUIRED_UPDATE_SIDECAR_FILES, *OPTIONAL_UPDATE_SIDECAR_FILES):
             source = package_dir / name
+            if not source.exists():
+                continue
             destination = app_dir / name
             sidecar_commands.extend(
                 [

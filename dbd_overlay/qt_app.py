@@ -53,7 +53,7 @@ from .maps import MapAsset, MapLibrary
 from .ocr_region import active_ocr_region, compute_auto_ocr_region
 from .plugins import PluginManager
 from .rendering import AnimatedImage, render_frame
-from .streak_sync import StreakSyncClient, StreakSyncError
+from .streak_sync import StreakSyncClient, StreakSyncError, load_packaged_streak_server_url
 from .tesseract import is_tesseract_path, tesseract_search_report
 from .update_status import AppUpdateStatus, check_for_app_update, stage_app_update
 from .updates import MapUpdateChecker
@@ -1140,26 +1140,36 @@ class OverlayQtApp(QMainWindow):
         self.streak_sync_enabled_check.setChecked(self.config.escape_streak.sync_enabled)
         self.streak_sync_enabled_check.toggled.connect(self._set_streak_sync_enabled)
         online_layout.addWidget(self.streak_sync_enabled_check)
-        online_layout.addWidget(label("Sync server URL", "muted"))
-        self.streak_server_entry = QLineEdit(self.config.escape_streak.sync_server_url)
-        self.streak_server_entry.setPlaceholderText("https://your-worker.your-domain.workers.dev")
-        self.streak_server_entry.textChanged.connect(self._sync_escape_streak_settings)
-        online_layout.addWidget(self.streak_server_entry)
-        online_layout.addWidget(label("Your display name", "muted"))
-        self.streak_player_name_entry = QLineEdit(self.config.escape_streak.sync_player_name)
-        self.streak_player_name_entry.setPlaceholderText("Your name")
-        self.streak_player_name_entry.textChanged.connect(self._sync_escape_streak_settings)
-        online_layout.addWidget(self.streak_player_name_entry)
+        online_layout.addWidget(label("Player tag", "muted"))
+        self.streak_player_tag_entry = QLineEdit(self.config.escape_streak.sync_player_tag)
+        self.streak_player_tag_entry.setPlaceholderText("Name#3213")
+        self.streak_player_tag_entry.textChanged.connect(self._sync_escape_streak_settings)
+        online_layout.addWidget(self.streak_player_tag_entry)
         online_layout.addWidget(label("Lobby code", "muted"))
+        code_row = QHBoxLayout()
         self.streak_online_code_entry = QLineEdit(self.config.escape_streak.sync_lobby_code)
-        self.streak_online_code_entry.setPlaceholderText("BLOOD-742")
+        self.streak_online_code_entry.setPlaceholderText("7G4K")
         self.streak_online_code_entry.textChanged.connect(self._sync_escape_streak_settings)
-        online_layout.addWidget(self.streak_online_code_entry)
+        code_row.addWidget(self.streak_online_code_entry, 1)
+        code_row.addWidget(make_button("Copy", self._copy_streak_lobby_code, secondary=True))
+        online_layout.addLayout(code_row)
+        self.streak_member_labels = []
+        members_card = card("darkCard")
+        members_layout = QVBoxLayout(members_card)
+        members_layout.setContentsMargins(10, 8, 10, 8)
+        members_layout.setSpacing(5)
+        members_layout.addWidget(label("Players", "muted"))
+        for idx in range(4):
+            member_label = label("(Empty Slot)", "muted")
+            self.streak_member_labels.append(member_label)
+            members_layout.addWidget(member_label)
+        online_layout.addWidget(members_card)
         online_actions = QHBoxLayout()
-        online_actions.addWidget(make_button("Create Code", self._create_streak_lobby))
-        online_actions.addWidget(make_button("Join Code", self._join_streak_lobby, secondary=True))
-        online_actions.addWidget(make_button("Push Now", self._push_streak_lobby_now, secondary=True))
+        online_actions.addWidget(make_button("Create Lobby", self._create_streak_lobby))
+        online_actions.addWidget(make_button("Join Lobby", self._join_streak_lobby, secondary=True))
+        online_actions.addWidget(make_button("Sync Now", self._push_streak_lobby_now, secondary=True))
         online_layout.addLayout(online_actions)
+        online_layout.addWidget(make_button("Leave Lobby", self._leave_streak_lobby, secondary=True))
         self.streak_sync_status_label = label("Online sync idle.", "muted")
         online_layout.addWidget(self.streak_sync_status_label)
         left_layout.addWidget(online)
@@ -1582,10 +1592,9 @@ class OverlayQtApp(QMainWindow):
         self.config.escape_streak.streak = int(self.streak_spin.value())
         if hasattr(self, "streak_sync_enabled_check"):
             self.config.escape_streak.sync_enabled = self.streak_sync_enabled_check.isChecked()
-        if hasattr(self, "streak_server_entry"):
-            self.config.escape_streak.sync_server_url = self.streak_server_entry.text().strip()
-        if hasattr(self, "streak_player_name_entry"):
-            self.config.escape_streak.sync_player_name = self.streak_player_name_entry.text().strip()
+        if hasattr(self, "streak_player_tag_entry"):
+            self.config.escape_streak.sync_player_tag = self.streak_player_tag_entry.text().strip()
+            self.config.escape_streak.sync_player_name = self.config.escape_streak.sync_player_tag
         if hasattr(self, "streak_online_code_entry"):
             self.config.escape_streak.sync_lobby_code = self.streak_online_code_entry.text().strip().upper()
         players = []
@@ -1617,7 +1626,7 @@ class OverlayQtApp(QMainWindow):
 
     def _apply_streak_sync_timer_state(self) -> None:
         streak = self.config.escape_streak
-        should_poll = bool(streak.sync_enabled and streak.sync_server_url.strip() and streak.sync_lobby_code.strip())
+        should_poll = bool(streak.sync_enabled and self._streak_server_url() and streak.sync_lobby_code.strip())
         if should_poll and not self._streak_sync_timer.isActive():
             self._streak_sync_timer.start(2500)
         elif not should_poll:
@@ -1629,7 +1638,26 @@ class OverlayQtApp(QMainWindow):
         self.logger.info("Streak sync: %s", message)
 
     def _streak_client(self) -> StreakSyncClient:
-        return StreakSyncClient(self.config.escape_streak.sync_server_url)
+        return StreakSyncClient(self._streak_server_url())
+
+    def _streak_server_url(self) -> str:
+        saved = self.config.escape_streak.sync_server_url.strip()
+        if saved:
+            return saved
+        try:
+            packaged = load_packaged_streak_server_url(self.root_path, self._resource_path())
+        except Exception as exc:
+            self.logger.warning("Could not load packaged streak server config: %s", exc)
+            return ""
+        if packaged:
+            self.config.escape_streak.sync_server_url = packaged
+        return packaged
+
+    def _copy_streak_lobby_code(self) -> None:
+        code = self.config.escape_streak.sync_lobby_code.strip().upper()
+        if code:
+            QApplication.clipboard().setText(code)
+            self._set_streak_sync_status(f"Copied lobby code {code}.")
 
     def _create_streak_lobby(self) -> None:
         self._sync_escape_streak_settings()
@@ -1639,7 +1667,7 @@ class OverlayQtApp(QMainWindow):
             try:
                 data = self._streak_client().create_lobby(
                     self.config.escape_streak.sync_player_id,
-                    self.config.escape_streak.sync_player_name,
+                    self.config.escape_streak.sync_player_tag,
                     self.config.escape_streak,
                 )
             except Exception as exc:
@@ -1658,7 +1686,7 @@ class OverlayQtApp(QMainWindow):
                 data = self._streak_client().join_lobby(
                     self.config.escape_streak.sync_lobby_code,
                     self.config.escape_streak.sync_player_id,
-                    self.config.escape_streak.sync_player_name,
+                    self.config.escape_streak.sync_player_tag,
                 )
             except Exception as exc:
                 self.bus.run_on_main.emit(lambda error=exc: self._set_streak_sync_status(str(error)))
@@ -1675,6 +1703,7 @@ class OverlayQtApp(QMainWindow):
             self.config.escape_streak.lobby_code = code
         self.config.escape_streak.sync_enabled = True
         self._apply_remote_streak_state(state)
+        self._refresh_streak_members(data.get("members", []))
         self._refresh_streak_sync_widgets()
         self._apply_streak_sync_timer_state()
         self._save_later()
@@ -1684,11 +1713,44 @@ class OverlayQtApp(QMainWindow):
         self._sync_escape_streak_settings()
         self._push_streak_state_if_connected(force=True)
 
+    def _leave_streak_lobby(self) -> None:
+        self._sync_escape_streak_settings()
+        if not self.config.escape_streak.sync_lobby_code.strip():
+            self._set_streak_sync_status("Enter or create a lobby first.")
+            return
+        self._set_streak_sync_status("Leaving lobby...")
+
+        def worker() -> None:
+            try:
+                self._streak_client().leave_lobby(
+                    self.config.escape_streak.sync_lobby_code,
+                    self.config.escape_streak.sync_player_id,
+                )
+            except Exception as exc:
+                self.bus.run_on_main.emit(lambda error=exc: self._finish_streak_sync_error(error))
+                return
+            self.bus.run_on_main.emit(self._finish_streak_lobby_leave)
+
+        threading.Thread(target=worker, name="StreakLobbyLeave", daemon=True).start()
+
+    def _finish_streak_lobby_leave(self) -> None:
+        self._streak_sync_busy = False
+        self.config.escape_streak.sync_enabled = False
+        self.config.escape_streak.sync_lobby_code = ""
+        self.config.escape_streak.lobby_code = ""
+        self._refresh_streak_sync_widgets()
+        self._refresh_streak_members([])
+        self._apply_streak_sync_timer_state()
+        self.overlay.refresh_settings()
+        self._refresh_escape_streak_preview()
+        self._save_later()
+        self._set_streak_sync_status("Left lobby.")
+
     def _push_streak_state_if_connected(self, force: bool = False) -> None:
         streak = self.config.escape_streak
         if not force and not streak.sync_enabled:
             return
-        if not (streak.sync_server_url.strip() and streak.sync_lobby_code.strip()):
+        if not (self._streak_server_url() and streak.sync_lobby_code.strip()):
             return
         if self._streak_sync_busy:
             return
@@ -1712,7 +1774,7 @@ class OverlayQtApp(QMainWindow):
         if self._streak_sync_busy:
             return
         streak = self.config.escape_streak
-        if not (streak.sync_enabled and streak.sync_server_url.strip() and streak.sync_lobby_code.strip()):
+        if not (streak.sync_enabled and self._streak_server_url() and streak.sync_lobby_code.strip()):
             self._apply_streak_sync_timer_state()
             return
         self._streak_sync_busy = True
@@ -1732,6 +1794,7 @@ class OverlayQtApp(QMainWindow):
         state = data.get("state", {})
         if isinstance(state, dict):
             self.config.escape_streak.sync_revision = int(state.get("sync_revision", self.config.escape_streak.sync_revision) or 0)
+        self._refresh_streak_members(data.get("members", []))
         self._set_streak_sync_status(f"Synced lobby {self.config.escape_streak.sync_lobby_code}.")
 
     def _finish_streak_sync_poll(self, data: dict) -> None:
@@ -1744,6 +1807,7 @@ class OverlayQtApp(QMainWindow):
                 self._refresh_streak_sync_widgets()
                 self.overlay.refresh_settings()
                 self._refresh_escape_streak_preview()
+        self._refresh_streak_members(data.get("members", []))
         self._set_streak_sync_status(f"Connected to {self.config.escape_streak.sync_lobby_code}.")
 
     def _finish_streak_sync_error(self, error: Exception) -> None:
@@ -1800,18 +1864,31 @@ class OverlayQtApp(QMainWindow):
         if not hasattr(self, "streak_sync_enabled_check"):
             return
         streak = self.config.escape_streak
-        for widget, value in (
-            (self.streak_sync_enabled_check, streak.sync_enabled),
-            (self.streak_server_entry, streak.sync_server_url),
-            (self.streak_player_name_entry, streak.sync_player_name),
-            (self.streak_online_code_entry, streak.sync_lobby_code),
-        ):
+        widgets = [(self.streak_sync_enabled_check, streak.sync_enabled)]
+        if hasattr(self, "streak_player_tag_entry"):
+            widgets.append((self.streak_player_tag_entry, streak.sync_player_tag))
+        if hasattr(self, "streak_online_code_entry"):
+            widgets.append((self.streak_online_code_entry, streak.sync_lobby_code))
+        for widget, value in widgets:
             widget.blockSignals(True)
             if isinstance(widget, QCheckBox):
                 widget.setChecked(bool(value))
             else:
                 widget.setText(str(value))
             widget.blockSignals(False)
+
+    def _refresh_streak_members(self, members: list[dict]) -> None:
+        if not hasattr(self, "streak_member_labels"):
+            return
+        for idx, member_label in enumerate(self.streak_member_labels):
+            if idx < len(members):
+                member = members[idx] if isinstance(members[idx], dict) else {}
+                tag = str(member.get("tag", "")).strip() or "Unknown"
+                host = "  crown" if member.get("host") else ""
+                own = "You" if tag.lower() == self.config.escape_streak.sync_player_tag.lower() else tag
+                member_label.setText(f"Skull  {own}{host}")
+            else:
+                member_label.setText("(Empty Slot)")
 
     def _set_performance_mode(self, checked: bool) -> None:
         self.config.detection.performance_mode = checked

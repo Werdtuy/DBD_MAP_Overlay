@@ -89,6 +89,7 @@ class EscapeStreakSettings:
     sync_enabled: bool = False
     sync_server_url: str = ""
     sync_lobby_code: str = ""
+    sync_player_tag: str = ""
     sync_player_id: str = ""
     sync_player_name: str = ""
     sync_revision: int = 0
