@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta 2.4
+
+- Reworked the companion UI with a darker forest-style background, custom painted navigation icons, and a staged live preview.
+- Enlarged and stabilized the overlay position selector so it has room to render without overlapping the scale controls.
+- Moved map sizing controls behind the advanced settings button to keep the main placement workflow cleaner.
+- Removed the manual Team editor panel and simplified online lobby member labels.
+- Clamped overlay placement to the selected monitor bounds so edge positions stay on the chosen screen.
+
 ## Beta 2.32
 
 - Removed the Cloudflare Worker README from the public repository.

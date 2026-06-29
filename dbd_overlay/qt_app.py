@@ -269,19 +269,79 @@ class HorrorRoot(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         gradient = QLinearGradient(0, 0, self.width(), self.height())
-        gradient.setColorAt(0.0, QColor("#040405"))
-        gradient.setColorAt(0.55, QColor("#070808"))
-        gradient.setColorAt(1.0, QColor("#13080A"))
+        gradient.setColorAt(0.0, QColor("#030404"))
+        gradient.setColorAt(0.45, QColor("#050807"))
+        gradient.setColorAt(0.72, QColor("#0A0707"))
+        gradient.setColorAt(1.0, QColor("#19090A"))
         painter.fillRect(self.rect(), gradient)
 
-        painter.setPen(QPen(QColor(74, 18, 24, 70), 1))
-        for idx in range(18):
-            x = int(self.width() * (idx / 17))
-            painter.drawLine(x, 0, max(0, x - 120), self.height())
-        painter.setPen(QPen(QColor(125, 28, 37, 35), 2))
-        for idx in range(6):
-            y = 64 + idx * 113
-            painter.drawLine(0, y, self.width(), y - 80)
+        ground = QRectF(0, self.height() * 0.58, self.width(), self.height() * 0.42)
+        ground_gradient = QLinearGradient(0, ground.top(), 0, ground.bottom())
+        ground_gradient.setColorAt(0.0, QColor(7, 11, 9, 80))
+        ground_gradient.setColorAt(1.0, QColor(0, 0, 0, 210))
+        painter.fillRect(ground, ground_gradient)
+
+        painter.setPen(QPen(QColor(22, 26, 23, 170), 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        for idx in range(16):
+            x = int((idx / 15) * self.width())
+            lean = -30 + (idx % 5) * 14
+            painter.drawLine(x, int(self.height() * 0.08), x + lean, self.height())
+            painter.setPen(QPen(QColor(31, 35, 31, 105), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawLine(x + lean // 2, int(self.height() * 0.22), x + lean - 70, int(self.height() * 0.42))
+            painter.drawLine(x + lean // 3, int(self.height() * 0.30), x + lean + 85, int(self.height() * 0.50))
+            painter.setPen(QPen(QColor(22, 26, 23, 170), 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+
+        for center_x, center_y, radius in (
+            (self.width() * 0.82, self.height() * 0.18, 130),
+            (self.width() * 0.72, self.height() * 0.56, 210),
+        ):
+            glow = QLinearGradient(center_x - radius, center_y - radius, center_x + radius, center_y + radius)
+            glow.setColorAt(0.0, QColor(211, 186, 133, 40))
+            glow.setColorAt(1.0, QColor(211, 36, 48, 0))
+            painter.fillRect(QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2), glow)
+
+        painter.setPen(QPen(QColor(120, 22, 30, 46), 1))
+        for idx in range(8):
+            y = 82 + idx * 96
+            painter.drawLine(0, y, self.width(), y - 34)
+
+
+class PreviewStageLabel(QLabel):
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect()
+        gradient = QLinearGradient(0, 0, rect.width(), rect.height())
+        gradient.setColorAt(0.0, QColor("#020303"))
+        gradient.setColorAt(0.42, QColor("#07100E"))
+        gradient.setColorAt(0.74, QColor("#09110F"))
+        gradient.setColorAt(1.0, QColor("#160708"))
+        painter.fillRect(rect, gradient)
+
+        mist = QLinearGradient(0, rect.height() * 0.25, 0, rect.height())
+        mist.setColorAt(0.0, QColor(23, 33, 30, 55))
+        mist.setColorAt(0.58, QColor(16, 22, 19, 105))
+        mist.setColorAt(1.0, QColor(0, 0, 0, 210))
+        painter.fillRect(rect, mist)
+
+        painter.setPen(QPen(QColor(18, 22, 20, 175), 4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        for idx in range(11):
+            x = int((idx / 10) * rect.width())
+            lean = -18 + (idx % 4) * 12
+            painter.drawLine(x, 0, x + lean, rect.height())
+            painter.setPen(QPen(QColor(43, 48, 42, 90), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawLine(x + lean // 2, int(rect.height() * 0.18), x + lean - 45, int(rect.height() * 0.36))
+            painter.drawLine(x + lean // 3, int(rect.height() * 0.24), x + lean + 54, int(rect.height() * 0.42))
+            painter.setPen(QPen(QColor(18, 22, 20, 175), 4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+
+        glow = QLinearGradient(rect.width() * 0.72, rect.height() * 0.1, rect.width() * 0.95, rect.height() * 0.35)
+        glow.setColorAt(0.0, QColor(235, 217, 160, 78))
+        glow.setColorAt(1.0, QColor(235, 217, 160, 0))
+        painter.fillRect(QRectF(rect.width() * 0.58, 0, rect.width() * 0.42, rect.height() * 0.5), glow)
+
+        painter.setPen(QPen(QColor(COLORS["border"]), 1))
+        painter.drawRoundedRect(rect.adjusted(1, 1, -2, -2), 8, 8)
+        super().paintEvent(event)
 
 
 class ClawLogo(QWidget):
@@ -314,17 +374,16 @@ class NavButton(QPushButton):
         rect = self.rect().adjusted(1, 1, -1, -1)
         selected = self.isChecked()
         if selected:
-            painter.fillRect(rect, QColor(45, 9, 13, 190))
+            painter.fillRect(rect, QColor(45, 9, 13, 205))
             painter.setPen(QPen(QColor(COLORS["accent"]), 2))
-            painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom())
-            painter.drawRoundedRect(QRectF(rect), 4, 4)
+            painter.drawRoundedRect(QRectF(rect.adjusted(4, 4, -4, -4)), 4, 4)
         elif self.underMouse():
             painter.fillRect(rect, QColor(30, 18, 20, 150))
         color = QColor(COLORS["accent"] if selected else "#8D8D8D")
-        self._draw_icon(painter, QRectF(36, 15, 52, 42), color)
+        self._draw_icon(painter, QRectF(37, 13, 50, 44), color)
         painter.setPen(QColor(COLORS["accent"] if selected else COLORS["muted"]))
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        painter.drawText(QRectF(6, 61, self.width() - 12, 24), Qt.AlignmentFlag.AlignCenter, self.nav_text.upper())
+        painter.drawText(QRectF(6, 63, self.width() - 12, 23), Qt.AlignmentFlag.AlignCenter, self.nav_text.upper())
 
     def _draw_icon(self, painter: QPainter, rect: QRectF, color: QColor) -> None:
         painter.setPen(QPen(color, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
@@ -332,40 +391,50 @@ class NavButton(QPushButton):
         cx = rect.center().x()
         cy = rect.center().y()
         if self.icon_name == "claw":
-            for idx, x in enumerate((rect.left() + 14, rect.center().x(), rect.right() - 14)):
-                painter.drawLine(QPointF(x, rect.top() + 2 + idx), QPointF(x - 5, rect.bottom() - 4))
-                painter.drawLine(QPointF(x, rect.top() + 2 + idx), QPointF(x + 5, rect.bottom() - 6))
+            for idx, x in enumerate((rect.left() + 12, rect.center().x(), rect.right() - 12)):
+                painter.drawLine(QPointF(x, rect.top() + 2 + idx), QPointF(x - 6, rect.bottom() - 5))
+                painter.drawLine(QPointF(x, rect.top() + 2 + idx), QPointF(x + 5, rect.bottom() - 8))
         elif self.icon_name == "streak":
-            painter.drawEllipse(QPointF(cx, cy), 15, 15)
-            painter.drawLine(QPointF(cx, rect.top() + 4), QPointF(cx, cy + 3))
-            painter.drawLine(QPointF(cx, cy + 3), QPointF(cx + 10, cy - 8))
+            painter.drawEllipse(QPointF(cx - 11, cy - 2), 6, 6)
+            painter.drawEllipse(QPointF(cx + 11, cy - 2), 6, 6)
+            painter.drawEllipse(QPointF(cx, cy - 11), 6, 6)
+            painter.drawArc(QRectF(rect.left() + 6, cy, 18, 18), 20 * 16, 145 * 16)
+            painter.drawArc(QRectF(rect.right() - 24, cy, 18, 18), 15 * 16, 145 * 16)
+            painter.drawArc(QRectF(cx - 10, cy - 4, 20, 22), 25 * 16, 130 * 16)
         elif self.icon_name == "ocr":
             painter.drawEllipse(QRectF(rect.left() + 8, rect.top() + 5, 24, 24))
             painter.drawLine(QPointF(rect.left() + 28, rect.top() + 29), QPointF(rect.right() - 7, rect.bottom() - 6))
         elif self.icon_name == "keys":
-            key_rect = rect.adjusted(5, 10, -5, -10)
+            key_rect = rect.adjusted(4, 12, -4, -8)
             painter.drawRoundedRect(key_rect, 4, 4)
-            for row in range(2):
-                for col in range(4):
-                    painter.drawRect(QRectF(key_rect.left() + 7 + col * 9, key_rect.top() + 7 + row * 9, 5, 5))
+            for col in range(5):
+                painter.drawRoundedRect(QRectF(key_rect.left() + 6 + col * 8, key_rect.top() + 7, 5, 5), 1, 1)
+                painter.drawRoundedRect(QRectF(key_rect.left() + 6 + col * 8, key_rect.top() + 17, 5, 5), 1, 1)
         elif self.icon_name == "settings":
-            painter.drawEllipse(QPointF(cx, cy), 9, 9)
-            for angle in range(0, 360, 60):
+            painter.drawEllipse(QPointF(cx, cy), 7, 7)
+            for angle in range(0, 360, 45):
                 import math
 
                 rad = math.radians(angle)
-                inner = QPointF(cx + math.cos(rad) * 15, cy + math.sin(rad) * 15)
-                outer = QPointF(cx + math.cos(rad) * 23, cy + math.sin(rad) * 23)
+                inner = QPointF(cx + math.cos(rad) * 14, cy + math.sin(rad) * 14)
+                outer = QPointF(cx + math.cos(rad) * 21, cy + math.sin(rad) * 21)
                 painter.drawLine(inner, outer)
         elif self.icon_name == "logs":
-            for idx in range(4):
-                y = rect.top() + 9 + idx * 8
-                painter.drawLine(QPointF(rect.left() + 8, y), QPointF(rect.right() - 8, y))
-                painter.drawEllipse(QPointF(rect.left() + 3, y), 1.5, 1.5)
+            for idx in range(5):
+                y = rect.top() + 8 + idx * 8
+                painter.drawLine(QPointF(rect.left() + 13, y), QPointF(rect.right() - 7, y))
+                painter.drawEllipse(QPointF(rect.left() + 5, y), 2, 2)
         elif self.icon_name == "maps":
-            painter.drawRect(QRectF(rect.left() + 8, rect.top() + 7, 30, 28))
-            painter.drawLine(QPointF(rect.left() + 18, rect.top() + 7), QPointF(rect.left() + 18, rect.top() + 35))
-            painter.drawLine(QPointF(rect.left() + 28, rect.top() + 7), QPointF(rect.left() + 28, rect.top() + 35))
+            painter.drawRoundedRect(QRectF(rect.left() + 8, rect.top() + 5, 31, 30), 2, 2)
+            painter.drawLine(QPointF(rect.left() + 18, rect.top() + 6), QPointF(rect.left() + 18, rect.top() + 34))
+            painter.drawLine(QPointF(rect.left() + 29, rect.top() + 6), QPointF(rect.left() + 29, rect.top() + 34))
+        elif self.icon_name == "brush":
+            painter.drawLine(QPointF(rect.left() + 15, rect.bottom() - 8), QPointF(rect.right() - 11, rect.top() + 8))
+            painter.drawRoundedRect(QRectF(rect.left() + 9, rect.bottom() - 16, 13, 10), 3, 3)
+        elif self.icon_name == "monitor":
+            painter.drawRoundedRect(QRectF(rect.left() + 8, rect.top() + 8, 34, 23), 2, 2)
+            painter.drawLine(QPointF(cx, rect.top() + 31), QPointF(cx, rect.bottom() - 5))
+            painter.drawLine(QPointF(cx - 10, rect.bottom() - 5), QPointF(cx + 10, rect.bottom() - 5))
         else:
             painter.drawRoundedRect(rect.adjusted(8, 8, -8, -8), 5, 5)
 
@@ -382,6 +451,7 @@ class PositionPicker(QWidget):
         super().__init__()
         self.config = config
         self.setMinimumHeight(270)
+        self.setMinimumWidth(430)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def paintEvent(self, _event) -> None:
@@ -394,9 +464,11 @@ class PositionPicker(QWidget):
         painter.drawRoundedRect(area, 8, 8)
         selected = self._selected()
         points = self._points(area)
+        cell_width = max(52, min(74, (area.width() - 56) / 4.2))
+        cell_height = max(38, min(50, (area.height() - 42) / 4.1))
         for row, col, center in points:
             is_selected = (row, col) == selected
-            rect = QRectF(center.x() - 32, center.y() - 22, 64, 44)
+            rect = QRectF(center.x() - cell_width / 2, center.y() - cell_height / 2, cell_width, cell_height)
             painter.setBrush(QColor(COLORS["accent_dark"] if is_selected else COLORS["input"]))
             painter.setPen(QPen(QColor(COLORS["accent"] if is_selected else COLORS["border"]), 3 if is_selected else 2))
             painter.drawRoundedRect(rect, 6, 6)
@@ -418,10 +490,10 @@ class PositionPicker(QWidget):
         return [(row, col) for row in range(4) for col in range(4) if row in {0, 3} or col in {0, 3}]
 
     def _points(self, area) -> list[tuple[int, int, QPointF]]:
-        left = area.left() + 34
-        right = area.right() - 34
-        top = area.top() + 24
-        bottom = area.bottom() - 24
+        left = area.left() + 42
+        right = area.right() - 42
+        top = area.top() + 34
+        bottom = area.bottom() - 34
         return [
             (
                 row,
@@ -560,14 +632,16 @@ class QtOverlayWindow(QWidget):
         monitor = monitors[min(max(overlay.monitor_index, 0), len(monitors) - 1)]
         size = int(overlay.size)
         height = self._window_height()
-        left = monitor.x + overlay.margin_x
-        top = monitor.y + overlay.margin_y
-        right = monitor.x + monitor.width - size - overlay.margin_x
-        bottom = monitor.y + monitor.height - height - overlay.margin_y
-        x_points = [left + round((right - left) * idx / 3) for idx in range(4)]
-        y_points = [top + round((bottom - top) * idx / 3) for idx in range(4)]
+        min_x = monitor.x + overlay.margin_x
+        min_y = monitor.y + overlay.margin_y
+        max_x = max(min_x, monitor.x + monitor.width - size - overlay.margin_x)
+        max_y = max(min_y, monitor.y + monitor.height - height - overlay.margin_y)
+        x_points = [min_x + round((max_x - min_x) * idx / 3) for idx in range(4)]
+        y_points = [min_y + round((max_y - min_y) * idx / 3) for idx in range(4)]
         row, col = selected_position_grid(overlay.corner)
-        return x_points[col], y_points[row]
+        x = min(max(x_points[col], min_x), max_x)
+        y = min(max(y_points[row], min_y), max_y)
+        return x, y
 
     def _apply_visibility(self) -> None:
         should_show = self.visible and self.config.overlay.enabled and self.asset is not None
@@ -765,8 +839,8 @@ class OverlayQtApp(QMainWindow):
         self._streak_applying_remote = False
 
         self.setWindowTitle("DBD Companion Overlay")
-        self.resize(1180, 780)
-        self.setMinimumSize(1020, 680)
+        self.resize(1380, 820)
+        self.setMinimumSize(1220, 720)
         self.setStyleSheet(APP_STYLESHEET)
         self._set_app_icon()
         self._build_ui()
@@ -933,87 +1007,18 @@ class OverlayQtApp(QMainWindow):
         layout = QHBoxLayout(page)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
-        preview_card = card()
-        preview_layout = QVBoxLayout(preview_card)
-        preview_layout.setContentsMargins(18, 18, 18, 18)
-        preview_header = QHBoxLayout()
-        preview_header.addWidget(label("Live Preview", "sectionTitle"))
-        preview_header.addStretch(1)
-        self.preview_toggle_hotkey_label = label(self._toggle_overlay_hotkey_text(), "muted")
-        preview_header.addWidget(self.preview_toggle_hotkey_label)
-        preview_layout.addLayout(preview_header)
-        self.preview_label = QLabel("No map selected")
-        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setMinimumHeight(430)
-        self.preview_label.setStyleSheet(f"background: {COLORS['panel_dark']}; border-radius: 4px;")
-        preview_layout.addWidget(self.preview_label, 1)
-        self.preview_streak_frame = card("darkCard")
-        streak_layout = QVBoxLayout(self.preview_streak_frame)
-        streak_layout.setContentsMargins(12, 8, 12, 8)
-        self.preview_streak_title = label("", "hudTitle")
-        self.preview_streak_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_streak_detail = label("", "muted")
-        self.preview_streak_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        streak_layout.addWidget(self.preview_streak_title)
-        streak_layout.addWidget(self.preview_streak_detail)
-        preview_layout.addWidget(self.preview_streak_frame)
-        self.preview = QtPreviewRenderer(self.preview_label, self.config)
-        self._refresh_escape_streak_preview()
-        layout.addWidget(preview_card, 3)
 
         controls_scroll = QScrollArea()
         controls_scroll.setObjectName("card")
         controls_scroll.setWidgetResizable(True)
-        controls = QWidget()
-        controls_layout = QVBoxLayout(controls)
-        controls_layout.setContentsMargins(16, 16, 16, 16)
-        controls_layout.setSpacing(12)
-        controls_scroll.setWidget(controls)
-        self.enabled_check = QCheckBox("Overlay enabled")
-        self.enabled_check.setChecked(self.config.overlay.enabled)
-        self.enabled_check.toggled.connect(self._toggle_enabled)
-        controls_layout.addWidget(self.enabled_check)
-        controls_layout.addWidget(make_button("Show Test Overlay", self._show_test_overlay))
-        self.overlay_status_label = label("Overlay status: starting", "muted")
-        controls_layout.addWidget(self.overlay_status_label)
-        controls_layout.addWidget(label("Position", "sectionTitle"))
-        self.position_picker = PositionPicker(self.config)
-        self.position_picker.position_changed.connect(self._set_position_grid)
-        controls_layout.addWidget(self.position_picker)
-        self.map_settings_button = make_button("Show Map Settings", self._toggle_map_settings, secondary=True)
-        controls_layout.addWidget(self.map_settings_button)
-        self.map_settings_frame = card("darkCard")
-        settings_layout = QVBoxLayout(self.map_settings_frame)
-        settings_layout.setContentsMargins(12, 12, 12, 12)
-        settings_layout.setSpacing(12)
-        self._build_monitor_picker(settings_layout)
-        self._add_slider(settings_layout, "Opacity", self.config.overlay.opacity, 0.2, 1.0, self._set_opacity)
-        self._add_slider(settings_layout, "Size", self.config.overlay.size, 120, 720, self._set_size)
-        self._add_slider(settings_layout, "Zoom", self.config.overlay.zoom, 0.4, 2.4, self._set_zoom)
-        self._add_slider(settings_layout, "Corner radius", self.config.overlay.corner_radius, 0, 80, self._set_radius)
-        self._add_slider(settings_layout, "Animation speed", self.config.overlay.animation_speed, 0.25, 3.0, self._set_animation_speed)
-        self.rotate_check = QCheckBox("Minimap rotation ready")
-        self.rotate_check.setChecked(self.config.overlay.rotate_with_minimap)
-        self.rotate_check.toggled.connect(self._set_rotation)
-        settings_layout.addWidget(self.rotate_check)
-        self._build_profile_picker(settings_layout)
-        controls_layout.addWidget(self.map_settings_frame)
-        controls_layout.addStretch(1)
-        self._apply_map_settings_visibility()
-        layout.addWidget(controls_scroll, 2)
-        return page
-
-    def _build_overlay_tab(self) -> QWidget:
-        page = QWidget()
-        layout = QHBoxLayout(page)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(0)
-
+        controls_scroll.setMinimumWidth(520)
+        controls_scroll.setMaximumWidth(660)
         controls = card()
-        controls.setFixedWidth(430)
+        controls.setMinimumWidth(500)
         controls_layout = QVBoxLayout(controls)
         controls_layout.setContentsMargins(26, 24, 22, 18)
         controls_layout.setSpacing(14)
+        controls_scroll.setWidget(controls)
 
         controls_layout.addWidget(label("Overlay Enabled", "sectionTitle"))
         self.enabled_check = QCheckBox("Enable in-game overlay")
@@ -1036,9 +1041,10 @@ class OverlayQtApp(QMainWindow):
         map_row.addWidget(make_button("Open Map Library", self._toggle_map_library, secondary=True))
         controls_layout.addLayout(map_row)
 
+        self._build_monitor_picker(controls_layout)
         controls_layout.addWidget(label("Overlay Position", "sectionTitle"))
         self.position_picker = PositionPicker(self.config)
-        self.position_picker.setMinimumHeight(170)
+        self.position_picker.setMinimumHeight(270)
         self.position_picker.position_changed.connect(self._set_position_grid)
         controls_layout.addWidget(self.position_picker)
 
@@ -1052,7 +1058,6 @@ class OverlayQtApp(QMainWindow):
         settings_layout = QVBoxLayout(self.map_settings_frame)
         settings_layout.setContentsMargins(14, 14, 14, 14)
         settings_layout.setSpacing(12)
-        self._build_monitor_picker(settings_layout)
         self._add_slider(settings_layout, "Zoom", self.config.overlay.zoom, 0.4, 2.4, self._set_zoom)
         self._add_slider(settings_layout, "Corner radius", self.config.overlay.corner_radius, 0, 80, self._set_radius)
         self._add_slider(settings_layout, "Animation speed", self.config.overlay.animation_speed, 0.25, 3.0, self._set_animation_speed)
@@ -1060,11 +1065,10 @@ class OverlayQtApp(QMainWindow):
         self.rotate_check.setChecked(self.config.overlay.rotate_with_minimap)
         self.rotate_check.toggled.connect(self._set_rotation)
         settings_layout.addWidget(self.rotate_check)
-        self._build_profile_picker(settings_layout)
         controls_layout.addWidget(self.map_settings_frame)
         controls_layout.addStretch(1)
         self._apply_map_settings_visibility()
-        layout.addWidget(controls)
+        layout.addWidget(controls_scroll, 0)
 
         preview_card = card()
         preview_layout = QVBoxLayout(preview_card)
@@ -1072,14 +1076,11 @@ class OverlayQtApp(QMainWindow):
         preview_layout.setSpacing(14)
         preview_header = QVBoxLayout()
         preview_header.addWidget(label("Live Preview", "sectionTitle"))
-        preview_header.addWidget(label("This is how your overlay will look in-game.", "muted"))
         preview_layout.addLayout(preview_header)
-        self.preview_label = QLabel("No map selected")
+        self.preview_label = PreviewStageLabel("No map selected")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setMinimumHeight(430)
+        self.preview_label.setMinimumHeight(470)
         self.preview_label.setStyleSheet(
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
-            "stop:0 #050607, stop:0.55 #09100E, stop:1 #16090A);"
             f"border: 1px solid {COLORS['border']}; border-radius: 8px;"
         )
         preview_layout.addWidget(self.preview_label, 1)
@@ -1102,11 +1103,12 @@ class OverlayQtApp(QMainWindow):
 
     def _build_escape_streak_tab(self) -> QWidget:
         page = QWidget()
-        layout = QHBoxLayout(page)
+        layout = QVBoxLayout(page)
         layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(16)
+        layout.setSpacing(0)
 
         left = card()
+        left.setMaximumWidth(620)
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(18, 18, 18, 18)
         left_layout.setSpacing(14)
@@ -1174,37 +1176,11 @@ class OverlayQtApp(QMainWindow):
         online_layout.addWidget(self.streak_sync_status_label)
         left_layout.addWidget(online)
 
-        left_layout.addStretch(1)
-        layout.addWidget(left, 2)
-
-        right = card()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(18, 18, 18, 18)
-        right_layout.setSpacing(12)
-        right_layout.addWidget(label("Team", "sectionTitle"))
         self.player_name_entries = []
         self.player_status_menus = []
-        while len(self.config.escape_streak.players) < 4:
-            self.config.escape_streak.players.append(EscapeStreakPlayer())
-        for idx, player in enumerate(self.config.escape_streak.players[:4]):
-            player_card = card("darkCard")
-            player_layout = QGridLayout(player_card)
-            player_layout.setContentsMargins(12, 10, 12, 10)
-            player_layout.addWidget(label(f"Player {idx + 1}", "muted"), 0, 0)
-            name_entry = QLineEdit(player.name)
-            name_entry.setPlaceholderText(f"Player {idx + 1}")
-            name_entry.textChanged.connect(self._sync_escape_streak_settings)
-            status = QComboBox()
-            status.addItems(["Ready", "Escaped", "Dead", "Disconnected"])
-            status.setCurrentText(player.status if player.status in ["Ready", "Escaped", "Dead", "Disconnected"] else "Ready")
-            status.currentTextChanged.connect(self._sync_escape_streak_settings)
-            player_layout.addWidget(name_entry, 1, 0)
-            player_layout.addWidget(status, 1, 1)
-            self.player_name_entries.append(name_entry)
-            self.player_status_menus.append(status)
-            right_layout.addWidget(player_card)
-        right_layout.addStretch(1)
-        layout.addWidget(right, 3)
+        left_layout.addStretch(1)
+        layout.addWidget(left)
+        layout.addStretch(1)
         return page
 
     def _build_detection_tab(self) -> QWidget:
@@ -1597,10 +1573,11 @@ class OverlayQtApp(QMainWindow):
             self.config.escape_streak.sync_player_name = self.config.escape_streak.sync_player_tag
         if hasattr(self, "streak_online_code_entry"):
             self.config.escape_streak.sync_lobby_code = self.streak_online_code_entry.text().strip().upper()
-        players = []
-        for name_entry, status_menu in zip(self.player_name_entries, self.player_status_menus):
-            players.append(EscapeStreakPlayer(name=name_entry.text().strip(), status=status_menu.currentText()))
-        self.config.escape_streak.players = (players + [EscapeStreakPlayer() for _ in range(4)])[:4]
+        if getattr(self, "player_name_entries", None) and getattr(self, "player_status_menus", None):
+            players = []
+            for name_entry, status_menu in zip(self.player_name_entries, self.player_status_menus):
+                players.append(EscapeStreakPlayer(name=name_entry.text().strip(), status=status_menu.currentText()))
+            self.config.escape_streak.players = (players + [EscapeStreakPlayer() for _ in range(4)])[:4]
         self.overlay.refresh_settings()
         self._refresh_escape_streak_preview()
         self._apply_streak_sync_timer_state()
@@ -1884,9 +1861,9 @@ class OverlayQtApp(QMainWindow):
             if idx < len(members):
                 member = members[idx] if isinstance(members[idx], dict) else {}
                 tag = str(member.get("tag", "")).strip() or "Unknown"
-                host = "  crown" if member.get("host") else ""
                 own = "You" if tag.lower() == self.config.escape_streak.sync_player_tag.lower() else tag
-                member_label.setText(f"Skull  {own}{host}")
+                role = " - Host" if member.get("host") else ""
+                member_label.setText(f"{own}{role}")
             else:
                 member_label.setText("(Empty Slot)")
 
