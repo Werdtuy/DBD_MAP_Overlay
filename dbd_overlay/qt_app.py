@@ -258,6 +258,23 @@ def selected_position_grid(corner: str) -> tuple[int, int]:
     return 1, 3
 
 
+def selected_qscreen(monitor_index: int):
+    screens = QApplication.screens()
+    if not screens:
+        return None
+    index = max(0, int(monitor_index))
+    monitors = get_monitors()
+    if monitors:
+        monitor = monitors[min(index, len(monitors) - 1)]
+        monitor_name = monitor.name.lower()
+        monitor_tail = monitor_name.rsplit("\\", 1)[-1]
+        for screen in screens:
+            screen_name = screen.name().lower()
+            if screen_name == monitor_name or screen_name.endswith(monitor_tail):
+                return screen
+    return screens[min(index, len(screens) - 1)]
+
+
 def card(object_name: str = "card") -> QFrame:
     frame = QFrame()
     frame.setObjectName(object_name)
@@ -703,14 +720,22 @@ class QtOverlayWindow(QWidget):
 
     def _position(self) -> tuple[int, int]:
         overlay = self.config.overlay
-        monitors = get_monitors()
-        monitor = monitors[min(max(overlay.monitor_index, 0), len(monitors) - 1)]
+        screen = selected_qscreen(overlay.monitor_index)
         size = int(overlay.size)
         height = self._window_height()
-        min_x = monitor.x + overlay.margin_x
-        min_y = monitor.y + overlay.margin_y
-        max_x = max(min_x, monitor.x + monitor.width - size - overlay.margin_x)
-        max_y = max(min_y, monitor.y + monitor.height - height - overlay.margin_y)
+        if screen:
+            geometry = screen.geometry()
+            min_x = geometry.x() + overlay.margin_x
+            min_y = geometry.y() + overlay.margin_y
+            max_x = max(min_x, geometry.x() + geometry.width() - size - overlay.margin_x)
+            max_y = max(min_y, geometry.y() + geometry.height() - height - overlay.margin_y)
+        else:
+            monitors = get_monitors()
+            monitor = monitors[min(max(overlay.monitor_index, 0), len(monitors) - 1)]
+            min_x = monitor.x + overlay.margin_x
+            min_y = monitor.y + overlay.margin_y
+            max_x = max(min_x, monitor.x + monitor.width - size - overlay.margin_x)
+            max_y = max(min_y, monitor.y + monitor.height - height - overlay.margin_y)
         x_points = [min_x + round((max_x - min_x) * idx / 3) for idx in range(4)]
         y_points = [min_y + round((max_y - min_y) * idx / 3) for idx in range(4)]
         row, col = selected_position_grid(overlay.corner)
@@ -723,6 +748,12 @@ class QtOverlayWindow(QWidget):
         if should_show:
             size = int(self.config.overlay.size)
             x, y = self._position()
+            screen = selected_qscreen(self.config.overlay.monitor_index)
+            if screen:
+                self.createWinId()
+                handle = self.windowHandle()
+                if handle and handle.screen() != screen:
+                    handle.setScreen(screen)
             self.setGeometry(x, y, size, self._window_height())
             self.setWindowOpacity(self.config.overlay.opacity)
             self.show()
@@ -823,7 +854,10 @@ class QtOcrRegionWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
     def show_region(self, region: list[int], seconds: int = 8) -> None:
-        left, top, width, height = [max(0, int(value)) for value in region]
+        left = int(region[0]) if len(region) > 0 else 0
+        top = int(region[1]) if len(region) > 1 else 0
+        width = max(0, int(region[2])) if len(region) > 2 else 0
+        height = max(0, int(region[3])) if len(region) > 3 else 0
         if width <= 0 or height <= 0:
             self.logger.warning("Cannot show OCR region: width and height must be greater than zero")
             return
@@ -1993,7 +2027,8 @@ class OverlayQtApp(QMainWindow):
         if self.config.detection.auto_ocr_region:
             return
         try:
-            self.config.detection.ocr_region = [max(0, int(entry.text())) for entry in self.region_entries]
+            left, top, width, height = [int(entry.text()) for entry in self.region_entries]
+            self.config.detection.ocr_region = [left, top, max(1, width), max(1, height)]
             self._save_later()
         except ValueError:
             pass
@@ -2015,8 +2050,26 @@ class OverlayQtApp(QMainWindow):
         self._save_region()
         return self.config.detection.ocr_region
 
+    def _display_ocr_region(self, region: list[int]) -> list[int]:
+        if len(region) < 4:
+            return [0, 0, 1, 1]
+        screen = selected_qscreen(self.config.overlay.monitor_index)
+        monitors = get_monitors()
+        if not screen or not monitors:
+            return [int(region[0]), int(region[1]), max(1, int(region[2])), max(1, int(region[3]))]
+        monitor = monitors[min(max(self.config.overlay.monitor_index, 0), len(monitors) - 1)]
+        geometry = screen.geometry()
+        scale_x = geometry.width() / max(1, monitor.width)
+        scale_y = geometry.height() / max(1, monitor.height)
+        left = geometry.x() + round((int(region[0]) - monitor.x) * scale_x)
+        top = geometry.y() + round((int(region[1]) - monitor.y) * scale_y)
+        width = max(1, round(int(region[2]) * scale_x))
+        height = max(1, round(int(region[3]) * scale_y))
+        return [left, top, width, height]
+
     def _show_ocr_region(self) -> None:
-        self.ocr_region_overlay.show_region(self._current_ocr_region(), seconds=8)
+        region = self._current_ocr_region()
+        self.ocr_region_overlay.show_region(self._display_ocr_region(region), seconds=8)
 
     def _set_tesseract(self) -> None:
         self.config.detection.tesseract_cmd = self.tesseract_entry.text().strip()
@@ -2068,7 +2121,8 @@ class OverlayQtApp(QMainWindow):
             self._show_tesseract_search_output(f"Manually selected and saved Tesseract:\n{path}")
 
     def _test_ocr(self) -> None:
-        self.ocr_region_overlay.show_region(self._current_ocr_region(), seconds=8)
+        region = self._current_ocr_region()
+        self.ocr_region_overlay.show_region(self._display_ocr_region(region), seconds=8)
         self.ocr_result.setText("Testing OCR...")
 
         def run_test() -> None:
@@ -2328,7 +2382,8 @@ class OverlayQtApp(QMainWindow):
                 setattr(self.config.hotkeys, key, entry.text().strip())
         if hasattr(self, "region_entries") and not self.config.detection.auto_ocr_region:
             try:
-                self.config.detection.ocr_region = [max(0, int(entry.text())) for entry in self.region_entries]
+                left, top, width, height = [int(entry.text()) for entry in self.region_entries]
+                self.config.detection.ocr_region = [left, top, max(1, width), max(1, height)]
             except ValueError:
                 self.logger.warning("OCR region must contain whole numbers")
         if hasattr(self, "lobby_code_entry"):

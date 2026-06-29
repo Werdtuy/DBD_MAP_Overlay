@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 2.51
+
+- Locked overlay edge placement to the selected Qt monitor so positions such as `1,4` do not jump screens on multi-monitor setups.
+- Fixed the OCR scan-box preview for secondary monitors and scaled 4K displays by preserving negative coordinates and converting capture bounds for display.
+
 ## Beta 2.5
 
 - Extracted transparent navigation icon assets from the concept-art reference and wired them into the Qt side rail.

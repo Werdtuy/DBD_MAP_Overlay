@@ -23,5 +23,7 @@ def compute_auto_ocr_region(config: AppConfig) -> list[int]:
 def active_ocr_region(config: AppConfig) -> list[int]:
     if config.detection.auto_ocr_region:
         return compute_auto_ocr_region(config)
-    return [max(0, int(value)) for value in config.detection.ocr_region]
-
+    if len(config.detection.ocr_region) < 4:
+        return [0, 0, 1, 1]
+    left, top, width, height = [int(value) for value in config.detection.ocr_region[:4]]
+    return [left, top, max(1, width), max(1, height)]
