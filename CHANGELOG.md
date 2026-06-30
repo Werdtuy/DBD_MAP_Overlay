@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 2.56
+
+- Renamed the top Escape Streak lobby field to `Current lobby code` and made it read-only.
+
 ## Beta 2.55
 
 - Removed the player-status detail row from the real overlay and live preview Escape Streak strip.
